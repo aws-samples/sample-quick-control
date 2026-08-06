@@ -1,0 +1,102 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1420 890" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" role="img" aria-label="sample-quick-control v2.0 网页通道控制流程时序图：ensure → 配置起始 URL → 启动 CDP 实例 → 浏览器内人工登录 → chrome_as 驱动 → 截图验证">
+<title>网页通道控制流程 · 从零到可驱动（人工介入点 vs 自动步骤）</title>
+<desc>八步时序：①web_ensure.py ensure ②读取 QUICK_WEB_BASE / QUICK_WEB_ACCOUNT 等环境变量拼出起始 URL（代码不内置任何具体账户） ③启动带 :9445 的持久 profile Chrome ④轮询 /json/version 等发现层可用 ⑤人工在该 Chrome 窗口里完成登录（HUMAN GATE，无人值守到此为止） ⑥web_ensure.py login 轮询 signed_in（URL 不再命中 QUICK_UNAUTH_MARKERS） ⑦chrome_as.py 驱动 goto/click/fill/list ⑧screenshot 或 dump 验证。登录态存在持久 profile 里，重启 CDP 实例可跳过 ⑤⑥。失败分支：起始 URL 的账户占位符未配置时会停在错误页。</desc>
+<defs>
+<pattern id="grid" width="34" height="34" patternUnits="userSpaceOnUse"><path d="M34 0 H0 V34" fill="none" stroke="#EAEFF6" stroke-width="1"/></pattern>
+<marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M1 1 L9 5 L1 9" fill="none" stroke="context-stroke" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></marker>
+<style>@media (prefers-reduced-motion: no-preference){.flow{stroke-dasharray:6 6;animation:dm .8s linear infinite}.flowb{stroke-dasharray:6 6;animation:dmb .8s linear infinite}.gate{animation:gw 1.6s ease-in-out infinite}.gatebox{animation:go 1.6s ease-in-out infinite}}@keyframes dm{to{stroke-dashoffset:-12}}@keyframes dmb{to{stroke-dashoffset:12}}@keyframes gw{0%,100%{stroke-width:2.2}50%{stroke-width:3.6}}@keyframes go{0%,100%{stroke-opacity:.5}50%{stroke-opacity:1}}</style>
+</defs>
+<rect width="1420" height="890" fill="#FBFCFE"/><rect width="1420" height="890" fill="url(#grid)"/>
+<text x="40" y="46" font-size="21" font-weight="800" fill="#16202E">网页通道控制流程 · 从零到可驱动（自动步骤 vs 人工介入点）</text>
+<text x="40" y="68" font-size="12" fill="#5A6B7B">web_ensure ensure → 解析起始 URL（环境变量）→ 启动 :9445 持久 profile Chrome → login（在该窗口内人工登录一次）→ chrome_as.py 驱动 → 截图 / dump 验证</text>
+<rect x="1300" y="26" width="80" height="26" rx="13" fill="#EEF2FF" stroke="#4F46E5" stroke-width="1.4"/>
+<text x="1340" y="44" text-anchor="middle" font-size="11.5" font-weight="800" fill="#4338CA">v2.0.0</text>
+<rect x="55" y="100" width="230" height="48" rx="10" fill="#FFFFFF" stroke="#64748B" stroke-width="1.5"/>
+<text x="170" y="121" text-anchor="middle" font-size="12.5" font-weight="700" fill="#334155">调用方</text>
+<text x="170" y="137" text-anchor="middle" font-size="9.5" fill="#5A6B7B">你 / AI agent · 手动触发或剧本脚本</text>
+<line x1="170" y1="148" x2="170" y2="694" stroke="#CBD5E1" stroke-width="1.4" stroke-dasharray="3 6"/>
+<rect x="405" y="100" width="230" height="48" rx="10" fill="#FFFFFF" stroke="#4F46E5" stroke-width="1.5"/>
+<text x="520" y="121" text-anchor="middle" font-size="12.5" font-weight="700" fill="#4338CA">web_ensure.py</text>
+<text x="520" y="137" text-anchor="middle" font-size="9.5" fill="#5A6B7B">ensure / status / login / doctor / restart</text>
+<line x1="520" y1="148" x2="520" y2="694" stroke="#CBD5E1" stroke-width="1.4" stroke-dasharray="3 6"/>
+<rect x="785" y="100" width="230" height="48" rx="10" fill="#FFFFFF" stroke="#00A4A6" stroke-width="1.5"/>
+<text x="900" y="121" text-anchor="middle" font-size="12.5" font-weight="700" fill="#0B7E7F">Google Chrome · CDP :9445</text>
+<text x="900" y="137" text-anchor="middle" font-size="9.5" fill="#5A6B7B">~/.chrome-cdp-profile 持久 profile</text>
+<line x1="900" y1="148" x2="900" y2="694" stroke="#CBD5E1" stroke-width="1.4" stroke-dasharray="3 6"/>
+<rect x="1155" y="100" width="230" height="48" rx="10" fill="#FFFFFF" stroke="#E7157B" stroke-width="1.5"/>
+<text x="1270" y="121" text-anchor="middle" font-size="12.5" font-weight="700" fill="#B21667">你的身份提供方（IdP）</text>
+<text x="1270" y="137" text-anchor="middle" font-size="9.5" fill="#5A6B7B">登录页 / MFA · 由浏览器内人工完成</text>
+<line x1="1270" y1="148" x2="1270" y2="694" stroke="#CBD5E1" stroke-width="1.4" stroke-dasharray="3 6"/>
+<path class="flow" d="M 176 196 H 514" fill="none" stroke="#1D4ED8" stroke-width="2.0" marker-end="url(#ah)"/>
+<rect x="177.0" y="176.0" width="259.4" height="15.5" rx="3" fill="#FBFCFE" opacity="0.94"/>
+<text x="182.0" y="188.0" font-size="10.5" font-weight="700" fill="#48586a">① web_ensure.py ensure — 一条命令自愈整条链路</text>
+<path d="M 526 232 H 598 V 264 H 532" fill="none" stroke="#B45309" stroke-width="1.6" stroke-dasharray="4 4" marker-end="url(#ah)"/>
+<rect x="603.0" y="228.0" width="452.0" height="15.5" rx="3" fill="#FBFCFE" opacity="0.94"/>
+<text x="608.0" y="240.0" font-size="10.5" font-weight="700" fill="#B45309">② 解析起始 URL：QUICK_WEB_BASE，或 QUICK_WEB_REGION + QUICK_WEB_ACCOUNT</text>
+<rect x="603.0" y="245.0" width="452.0" height="14.5" rx="3" fill="#FBFCFE" opacity="0.94"/>
+<text x="608.0" y="256.0" font-size="9.5" fill="#5A6B7B">代码里只留占位账户名 —— 账户因人 / 因组织而异，绝不内置任何具体账户</text>
+<rect x="608" y="262" width="52" height="16" rx="8" fill="#FEF3C7" stroke="#B45309" stroke-width="1"/>
+<text x="634" y="274" text-anchor="middle" font-size="9" font-weight="700" fill="#B45309">一次性</text>
+<rect x="666" y="262" width="220" height="16" rx="8" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1"/>
+<text x="776" y="274" text-anchor="middle" font-size="9" fill="#5A6B7B">QUICK_UNAUTH_MARKERS 可覆盖未登录判据</text>
+<rect x="529.0" y="284.0" width="322.4" height="15.5" rx="3" fill="#FBFCFE" opacity="0.94"/>
+<text x="534.0" y="296.0" font-size="10.5" font-weight="700" fill="#48586a">③ 启动持久 profile Chrome：--remote-debugging-port=9445</text>
+<rect x="529.0" y="298.0" width="349.6" height="14.5" rx="3" fill="#FBFCFE" opacity="0.94"/>
+<text x="534.0" y="309.0" font-size="9.5" fill="#5A6B7B">--user-data-dir=~/.chrome-cdp-profile（与日常主浏览器互不干扰）</text>
+<path class="flow" d="M 526 314 H 894" fill="none" stroke="#1D4ED8" stroke-width="2.0" marker-end="url(#ah)"/>
+<path class="flowb" d="M 894 356 H 526" fill="none" stroke="#0F766E" stroke-width="2.0" marker-end="url(#ah)"/>
+<rect x="529.0" y="336.5" width="420.5" height="15.0" rx="3" fill="#FBFCFE" opacity="0.94"/>
+<text x="534.0" y="348.0" font-size="10" fill="#0F766E">④ 轮询 /json/version（最多 30s）→ ✓ 发现层真响应即视为就绪（不只看端口 LISTEN）</text>
+<rect x="800.0" y="374.5" width="423.0" height="15.0" rx="3" fill="#FBFCFE" opacity="0.94"/>
+<text x="805.0" y="386.0" font-size="10" font-weight="700" fill="#0369A1">打开起始 URL → 未登录时被你的 IdP 接管（URL 命中未登录特征 → signed_in() 为假）</text>
+<path d="M 906 406 H 1264" fill="none" stroke="#0369A1" stroke-width="1.6" stroke-dasharray="2 5" marker-end="url(#ah)" opacity="0.85"/>
+<rect class="gatebox" x="60" y="434" width="1330" height="62" rx="10" fill="rgba(231,21,123,0.05)" stroke="#E7157B" stroke-width="1.8" stroke-dasharray="7 5"/>
+<rect x="60" y="434" width="10" height="62" rx="4" fill="#E7157B"/>
+<path class="gate flow" d="M 176 474 H 1264" fill="none" stroke="#E7157B" stroke-width="2.2" marker-end="url(#ah)"/>
+<rect x="181.0" y="451.5" width="283.0" height="16.0" rx="3" fill="#FBFCFE" opacity="0.94"/>
+<text x="186.0" y="464.0" font-size="11" font-weight="700" fill="#B21667">⑤ 人工：在这个 Chrome 窗口里完成登录（不自动登录）</text>
+<g transform="translate(946,456)"><circle cx="8" cy="8" r="6.4" fill="none" stroke="#E7157B" stroke-width="2.2"/><path d="M14 8 H30 M25 8 V13 M29 8 V13" fill="none" stroke="#E7157B" stroke-width="2.2" stroke-linecap="round"/></g>
+<rect x="981.0" y="456.0" width="276.2" height="15.5" rx="3" fill="#FBFCFE" opacity="0.94"/>
+<text x="986.0" y="468.0" font-size="10.5" font-weight="700" fill="#B21667">HUMAN GATE · 无人值守到此为止（凭证只在浏览器里输）</text>
+<path class="flowb" d="M 1264 528 H 526" fill="none" stroke="#0F766E" stroke-width="1.8" marker-end="url(#ah)"/>
+<rect x="529.0" y="508.5" width="509.0" height="15.0" rx="3" fill="#FBFCFE" opacity="0.94"/>
+<text x="534.0" y="520.0" font-size="10" fill="#0F766E">⑥ web_ensure.py login 轮询 signed_in()（url 不再命中 QUICK_UNAUTH_MARKERS）→ ✓ 登录成功；此后会话持久</text>
+<rect x="181.0" y="550.0" width="457.8" height="15.5" rx="3" fill="#FBFCFE" opacity="0.94"/>
+<text x="186.0" y="562.0" font-size="10.5" font-weight="700" fill="#48586a">⑦ chrome_as.py 驱动（35 命令 · 11 区）：goto / click / fill / list / screenshot</text>
+<rect x="181.0" y="564.0" width="410.9" height="14.5" rx="3" fill="#FBFCFE" opacity="0.94"/>
+<text x="186.0" y="575.0" font-size="9.5" fill="#5A6B7B">CDP 下 locator.fill() 直接生效 —— 写操作静默后台执行，不再提标签前台、不再走剪贴板</text>
+<path class="flow" d="M 176 582 H 894" fill="none" stroke="#1D4ED8" stroke-width="2.0" marker-end="url(#ah)" marker-start="url(#ah)"/>
+<path class="flowb" d="M 894 634 H 176" fill="none" stroke="#0F766E" stroke-width="2.0" marker-end="url(#ah)"/>
+<rect x="181.0" y="614.5" width="459.0" height="15.0" rx="3" fill="#FBFCFE" opacity="0.94"/>
+<text x="186.0" y="626.0" font-size="10" fill="#0F766E">⑧ 验证：screenshot /tmp/x.png（CDP 原生截图，v1.x 因无屏幕录制权限做不到）或 dump 结构</text>
+<path d="M 900 658 V 682 H 120 V 598" fill="none" stroke="#94A3B8" stroke-width="1.4" stroke-dasharray="4 5" marker-end="url(#ah)"/>
+<rect x="135.0" y="665.0" width="424.0" height="14.5" rx="3" fill="#FBFCFE" opacity="0.94"/>
+<text x="140.0" y="676.0" font-size="9.5" fill="#64748B">登录态存在持久 profile 里：重启 CDP 实例后跳过 ⑤⑥，直接从 ⑦ 继续（②③ 也只需 ensure 一次）</text>
+<circle r="4.0" fill="#1D4ED8" opacity="0"><animateMotion dur="12s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;0.0010;0.0944;1" path="M 176 196 H 514"/><animate attributeName="opacity" dur="12s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;0.0010;0.0944"/></circle>
+<circle r="4.0" fill="#1D4ED8" opacity="0"><animateMotion dur="12s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;0.2222;0.3167;1" path="M 526 314 H 894"/><animate attributeName="opacity" dur="12s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;0.2222;0.3167"/></circle>
+<circle r="3.6" fill="#0F766E" opacity="0"><animateMotion dur="12s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;0.3333;0.4278;1" path="M 894 356 H 526"/><animate attributeName="opacity" dur="12s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;0.3333;0.4278"/></circle>
+<circle r="3.4" fill="#0369A1" opacity="0"><animateMotion dur="12s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;0.4444;0.5389;1" path="M 906 406 H 1264"/><animate attributeName="opacity" dur="12s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;0.4444;0.5389"/></circle>
+<circle r="4.4" fill="#E7157B" opacity="0"><animateMotion dur="12s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;0.5556;0.6500;1" path="M 176 474 H 1264"/><animate attributeName="opacity" dur="12s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;0.5556;0.6500"/></circle>
+<circle r="3.6" fill="#0F766E" opacity="0"><animateMotion dur="12s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;0.6667;0.7611;1" path="M 1264 528 H 526"/><animate attributeName="opacity" dur="12s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;0.6667;0.7611"/></circle>
+<circle r="4.0" fill="#1D4ED8" opacity="0"><animateMotion dur="12s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;0.7778;0.8722;1" path="M 176 582 H 894"/><animate attributeName="opacity" dur="12s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;0.7778;0.8722"/></circle>
+<circle r="3.4" fill="#0F766E" opacity="0"><animateMotion dur="12s" repeatCount="indefinite" calcMode="linear" keyPoints="1;1;0;0" keyTimes="0;0.7778;0.8722;1" path="M 176 582 H 894"/><animate attributeName="opacity" dur="12s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;0.7778;0.8722"/></circle>
+<circle r="3.6" fill="#0F766E" opacity="0"><animateMotion dur="12s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;0.8889;0.9833;1" path="M 894 634 H 176"/><animate attributeName="opacity" dur="12s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;0.8889;0.9833"/></circle>
+<rect x="60" y="714" width="1330" height="80" rx="10" fill="rgba(221,52,76,0.045)" stroke="#DD344C" stroke-width="1.5" stroke-dasharray="6 4"/>
+<rect x="60" y="714" width="10" height="80" rx="4" fill="#DD344C"/>
+<text x="86" y="736" font-size="11.5" font-weight="700" fill="#B3202F">失败分支：CDP 就绪 ≠ 可驱动 —— ② 的账户名仍是占位符、或 ⑤ 的人工登录没做完，signed_in() 就恒为假，⑦ 会在错误页上找不到元素：</text>
+<rect x="86" y="744" width="700" height="18" rx="4" fill="#FFFFFF" stroke="#F3C6CC" stroke-width="1"/>
+<text x="96" y="757" font-size="10" fill="#B3202F">&#8220;⚠ 尚未登录 —— 跑 web_ensure.py login，然后在打开的窗口里登录&#8221;（ensure 的告警）</text>
+<rect x="86" y="766" width="700" height="18" rx="4" fill="#FFFFFF" stroke="#F3C6CC" stroke-width="1"/>
+<text x="96" y="779" font-size="10" fill="#B3202F">&#8220;✗ 等待超时 —— 未检测到登录成功&#8221;（login 等满 300s 仍未通过，退出码 1）</text>
+<text x="800" y="757" font-size="10" fill="#5A6B7B">→ 先看第二种：起始 URL 里的账户名若仍是占位符，页面压根打不开你的 Quick 空间。</text>
+<text x="800" y="779" font-size="10" fill="#5A6B7B">修法：设 QUICK_WEB_ACCOUNT（或整体覆盖 QUICK_WEB_BASE），再跑 web_ensure.py doctor 逐项确认。</text>
+<text x="40" y="828" font-size="11" font-weight="700" fill="#16202E">Flows</text>
+<circle cx="92" cy="824" r="5" fill="#1D4ED8"/><text x="102" y="828" font-size="10.5" fill="#5A6B7B">自动 · 控制指令 →</text>
+<circle cx="222" cy="824" r="5" fill="#0F766E"/><text x="232" y="828" font-size="10.5" fill="#5A6B7B">自动 · 回执 / 回读 ←</text>
+<circle cx="368" cy="824" r="5" fill="#0369A1"/><text x="378" y="828" font-size="10.5" fill="#5A6B7B">登录重定向</text>
+<circle cx="466" cy="824" r="5" fill="#B45309"/><text x="476" y="828" font-size="10.5" fill="#5A6B7B">一次性前置配置</text>
+<circle cx="576" cy="824" r="5" fill="#E7157B"/><text x="586" y="828" font-size="10.5" fill="#5A6B7B">人工介入（脉冲 · HUMAN GATE）</text>
+<circle cx="786" cy="824" r="5" fill="#DD344C"/><text x="796" y="828" font-size="10.5" fill="#5A6B7B">失败分支</text>
+<text x="40" y="856" font-size="10" fill="#5A6B7B">安全边界（如实表述）：本工具不碰凭证 —— 不读、不存、不代填任何账号密码或 MFA；登录只在 ⑤ 由你在那个 Chrome 窗口里亲手完成，会话 cookie 由 Chrome 存在你自己的 --user-data-dir 里。工具做的只是「启动带 CDP 的 Chrome」+「按 URL 特征判断登录态」。无人值守拿不到会话。</text>
+<text x="40" y="874" font-size="10" fill="#94A3B8">被推翻的旧结论：v1.x 曾把 :9222 上 /json/* 全 404 归因为「企业策略掐死 DevTools 发现层」—— 实为主 Chrome 从未带 --remote-debugging-port，:9222 是无关服务。教训：先验证目标进程的启动参数，再谈企业策略。</text>
+</svg>

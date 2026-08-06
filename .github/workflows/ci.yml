@@ -1,0 +1,109 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: pytest py${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.10 = pyproject 声明的最低版本，必须测：v2.0 的 f-string 反斜杠
+        # 不兼容就是只在 3.10 才暴露的。3.13 = 本机开发版本。
+        python-version: ['3.10', '3.13']
+    env:
+      # 故意指向不存在的端口：runner 上没有 Quick Desktop / CDP Chrome，
+      # conftest 探测失败 → realmachine 层自动 skip。写死假端口而非留空，
+      # 是为了防止 runner 上偶然有服务占用 9333/9445 导致真机测试被"唤醒"后失败。
+      QUICK_CDP_PORT: '59333'
+      QUICK_WEB_CDP_PORT: '59445'
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v9
+        with:
+          python-version: ${{ matrix.python-version }}
+          enable-cache: true
+          cache-dependency-glob: pyproject.toml
+
+      # 无真机层：必须全 pass、0 skip。若这里出现 skip 说明护栏被意外静默了。
+      # --with ruff 是必需的：test_min_python_syntax_gate 用 shutil.which("ruff")
+      # 找不到就 skipif —— 少了它，py3.10 语法门会静默跳过，CI 变成假绿。
+      # --python 显式钉版本：不依赖 setup-uv 是否设了 UV_PYTHON，
+      # 否则两个 matrix job 可能跑同一个解释器，3.10 那道门就形同虚设。
+      - name: pytest (unit + regression, 0 skip expected)
+        run: >-
+          uv run --python ${{ matrix.python-version }}
+          --with pytest --with playwright --with 'ruff>=0.12,<0.13'
+          python -m pytest tests/ -q --strict-markers -rs
+          -m "not realmachine"
+
+      # 真机层：CI 上必然无 Quick/Chrome，断言它"优雅 skip 而非 fail"。
+      # 这一步本身就是对 conftest skip 逻辑的回归测试 —— 若哪天有人把
+      # skip 写成 fail，或探测逻辑坏掉，这一步会红。
+      - name: pytest (realmachine layer must auto-skip, never fail)
+        run: >-
+          uv run --python ${{ matrix.python-version }}
+          --with pytest --with playwright
+          python -m pytest tests/ -q --strict-markers -rs
+          -m realmachine
+
+  lint:
+    name: ruff
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v9
+        with:
+          enable-cache: true
+          cache-dependency-glob: pyproject.toml
+
+      # 读 pyproject 的 [tool.ruff]：target-version=py310 + 项目风格 ignore
+      - name: ruff check
+        run: uv run --with 'ruff>=0.12,<0.13' ruff check .
+
+      # 独立的最低版本语法门：--isolated 绕过 pyproject 的 ignore，
+      # 保证有人调 ignore 列表也绕不过这道门。与 test_min_python_syntax_gate 同源。
+      - name: ruff py310 syntax gate (isolated)
+        run: >-
+          uv run --with 'ruff>=0.12,<0.13'
+          ruff check --isolated --target-version py310 --select E9
+          --output-format concise scripts tests
+
+  hygiene:
+    name: secret scan + version consistency
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # 本项目控制内部系统、文档里大量出现凭证/端口话题，
+      # 手滑把真 token 贴进 README 或脚本的风险是真实的。
+      - name: no credential-like strings in tracked files
+        run: |
+          if git grep -nIE '(ABSK[A-Za-z0-9]{8,}|sk-[A-Za-z0-9]{20,}|gh[pousr]_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----|xox[baprs]-[A-Za-z0-9-]{10,})' -- .; then
+            echo "::error::credential-like string found in tracked files"
+            exit 1
+          fi
+          echo "no credential-like strings found"
+
+      # v1.1.0 时 pyproject 的 version 漏更（停在 1.0.0）。这道门防止复发。
+      - name: pyproject version == top CHANGELOG version
+        run: |
+          PV=$(grep -m1 -oE '^version = "[^"]+"' pyproject.toml | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+          CV=$(grep -m1 -oE '^## \[[0-9]+\.[0-9]+\.[0-9]+\]' CHANGELOG.md | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+          echo "pyproject=$PV changelog=$CV"
+          test -n "$PV" && test -n "$CV" || { echo "::error::version not parseable"; exit 1; }
+          test "$PV" = "$CV" || { echo "::error::version drift: pyproject=$PV changelog=$CV"; exit 1; }

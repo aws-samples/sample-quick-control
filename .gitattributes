@@ -1,0 +1,17 @@
+# 统一入库为 LF，避免跨平台 checkout 造成全文件 diff
+* text=auto eol=lf
+
+# 源码/文档显式声明为文本
+*.py    text diff=python
+*.md    text
+*.toml  text
+*.yml   text
+*.svg   text
+
+# 架构图是手写/生成的 SVG：当作文本可 diff，但在 PR 里折叠为"生成物"，
+# 避免几百行坐标变更淹没真正的代码评审
+docs/*.svg linguist-generated=true
+
+# 二进制
+*.png   binary
+*.ico   binary

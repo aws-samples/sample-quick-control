@@ -1,0 +1,51 @@
+[project]
+name = "sample-quick-control"
+version = "2.0.0"
+description = "程序化控制本机 macOS 上的 Amazon Quick Desktop 应用与网页版 —— 双目标·单协议：桌面端 Electron CDP (:9333) + 网页版 Chrome CDP (:9445)"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT-0" }
+authors = [{ name = "Amazon.com, Inc. or its affiliates" }]
+dependencies = [
+    "playwright>=1.40",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8.0"]
+# ruff 钉大版本:避免升级引入新规则把 CI 变红,也让本机与 CI 一致
+lint = ["ruff>=0.12,<0.13"]
+
+[tool.ruff]
+# 与 requires-python 保持一致:ruff 按此版本做语法校验,
+# 于是在本机 3.13 上也能抓到 3.10/3.11 的 SyntaxError(如 PEP 701 f-string)。
+target-version = "py310"
+line-length = 200          # 仅文档化本项目的长行风格;E501 未启用
+extend-exclude = [".venv"]
+
+[tool.ruff.lint]
+# 默认 select = ["E4","E7","E9","F"]:保留 E9(语法/IO 错) 与 F(pyflakes)
+# 这两类真能抓 bug 的规则。下面 ignore 的是本项目刻意采用的紧凑单行风格,
+# 重排会产生 300+ 行无关 diff、破坏 git blame,收益为零。
+ignore = [
+    "E701",  # if x: do()      —— dispatch 表刻意单行
+    "E702",  # a(); b()        —— 同上
+    "E401",  # import a, b, c  —— 脚本首行合并导入
+    "E722",  # bare except     —— probe/crawl 探针脚本刻意兜底,失败即跳过
+    "E741",  # 变量名 l        —— 列表推导里 l = line,局部作用域内无歧义
+    "E731",  # lambda 赋值     —— verify_all 的 check() 表驱动写法
+]
+
+[tool.ruff.lint.per-file-ignores]
+# 探针/一次性脚本:留着未用的 import,便于交互式调试时随手 json.dumps
+"scripts/probe_*.py" = ["F401"]
+"scripts/crawl_*.py" = ["F401", "F841"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "realmachine: 需要 Amazon Quick 真机在跑(CDP:9333)才能执行,否则 skip",
+]
+addopts = "-ra -q"
+
+[tool.uv]
+package = false

@@ -1,0 +1,18 @@
+# https://editorconfig.org — 让编辑器不要在 diff 里制造无关噪音
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+# Markdown 行尾两空格是硬换行语法，不能裁
+[*.md]
+trim_trailing_whitespace = false
+indent_size = 2
+
+[*.{yml,yaml,toml,json,svg}]
+indent_size = 2
