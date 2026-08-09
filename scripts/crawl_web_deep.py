@@ -7,6 +7,26 @@
 """
 import subprocess, json, time, sys, os
 
+def _out_dir() -> str:
+    """默认输出目录:用户私有缓存目录(0700),而不是全局可写的 /tmp。
+
+    ★ 为什么不用 /tmp(bandit B108,PCSR 审核项):/tmp 全局可写且路径可预测,
+      多用户机器上他人可预先创建同名文件或符号链接抢占(symlink attack),
+      导致我们把截图/页面结构写到攻击者能读的位置、或覆盖其它文件。
+      本项目是公开 sample —— 客户会照抄这个模式,所以这里做对更重要。
+    覆盖方式:环境变量 QUICK_OUT_DIR,或命令行显式传路径(接口未变)。
+    """
+    d = os.environ.get("QUICK_OUT_DIR") or os.path.join(
+        os.path.expanduser("~"), ".cache", "quick-control")
+    os.makedirs(d, mode=0o700, exist_ok=True)
+    return d
+
+
+def _out(name: str) -> str:
+    """把一个默认文件名解析成用户私有目录下的绝对路径。"""
+    return os.path.join(_out_dir(), name)
+
+
 # 账户名因人/因组织而异,默认只给占位符 —— 跑之前先 export QUICK_WEB_ACCOUNT=...
 BASE = os.environ.get(
     "QUICK_WEB_BASE",
@@ -17,7 +37,7 @@ BASE = os.environ.get(
 ).rstrip("/") + "/"
 AREAS = ["mystuff","spaces","research","agents","apps","flows",
          "analyses","dashboards","data","folders/personal","folders/shared"]
-OUT = "/tmp/quickweb_deep"
+OUT = _out("quickweb_deep")
 
 def osa(script):
     p = subprocess.run(["osascript","-e",script], capture_output=True, text=True)

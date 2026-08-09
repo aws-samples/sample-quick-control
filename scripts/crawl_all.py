@@ -5,8 +5,28 @@
 import sys, os, json, time
 from playwright.sync_api import sync_playwright
 
+def _out_dir() -> str:
+    """默认输出目录:用户私有缓存目录(0700),而不是全局可写的 /tmp。
+
+    ★ 为什么不用 /tmp(bandit B108,PCSR 审核项):/tmp 全局可写且路径可预测,
+      多用户机器上他人可预先创建同名文件或符号链接抢占(symlink attack),
+      导致我们把截图/页面结构写到攻击者能读的位置、或覆盖其它文件。
+      本项目是公开 sample —— 客户会照抄这个模式,所以这里做对更重要。
+    覆盖方式:环境变量 QUICK_OUT_DIR,或命令行显式传路径(接口未变)。
+    """
+    d = os.environ.get("QUICK_OUT_DIR") or os.path.join(
+        os.path.expanduser("~"), ".cache", "quick-control")
+    os.makedirs(d, mode=0o700, exist_ok=True)
+    return d
+
+
+def _out(name: str) -> str:
+    """把一个默认文件名解析成用户私有目录下的绝对路径。"""
+    return os.path.join(_out_dir(), name)
+
+
 PORT=os.environ.get("QUICK_CDP_PORT","9333")
-OUT=sys.argv[1] if len(sys.argv)>1 else "/tmp/quickmap"
+OUT=sys.argv[1] if len(sys.argv)>1 else _out("quickmap")
 os.makedirs(OUT, exist_ok=True)
 
 MAPJS = r"""

@@ -57,6 +57,26 @@ import os
 import sys
 import time
 
+def _out_dir() -> str:
+    """默认输出目录:用户私有缓存目录(0700),而不是全局可写的 /tmp。
+
+    ★ 为什么不用 /tmp(bandit B108,PCSR 审核项):/tmp 全局可写且路径可预测,
+      多用户机器上他人可预先创建同名文件或符号链接抢占(symlink attack),
+      导致我们把截图/页面结构写到攻击者能读的位置、或覆盖其它文件。
+      本项目是公开 sample —— 客户会照抄这个模式,所以这里做对更重要。
+    覆盖方式:环境变量 QUICK_OUT_DIR,或命令行显式传路径(接口未变)。
+    """
+    d = os.environ.get("QUICK_OUT_DIR") or os.path.join(
+        os.path.expanduser("~"), ".cache", "quick-control")
+    os.makedirs(d, mode=0o700, exist_ok=True)
+    return d
+
+
+def _out(name: str) -> str:
+    """把一个默认文件名解析成用户私有目录下的绝对路径。"""
+    return os.path.join(_out_dir(), name)
+
+
 PORT = os.environ.get("QUICK_WEB_CDP_PORT", "9445")
 CDP = f"http://127.0.0.1:{PORT}"
 
@@ -294,7 +314,7 @@ def eval_js(urlsub: str, js: str) -> None:
         _close(pw, b)
 
 
-def screenshot(path: str = "/tmp/quickweb.png") -> None:
+def screenshot(path: str = _out("quickweb.png")) -> None:
     """CDP 带来的新能力：AppleScript 时代因终端无屏幕录制权限做不到。"""
     pw, b, pg = _page("quicksight")
     try:
@@ -849,7 +869,7 @@ def main() -> None:
     elif c == "evalf":
         eval_js(a[0], open(a[1]).read())
     elif c == "screenshot":
-        screenshot(a[0] if a else "/tmp/quickweb.png")
+        screenshot(a[0] if a else _out("quickweb.png"))
     elif c == "goto":
         goto(a[0])
     elif c == "wait-text":

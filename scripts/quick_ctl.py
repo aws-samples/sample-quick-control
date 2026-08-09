@@ -61,6 +61,26 @@
 """
 import sys, os, time, json, subprocess
 
+def _out_dir() -> str:
+    """默认输出目录:用户私有缓存目录(0700),而不是全局可写的 /tmp。
+
+    ★ 为什么不用 /tmp(bandit B108,PCSR 审核项):/tmp 全局可写且路径可预测,
+      多用户机器上他人可预先创建同名文件或符号链接抢占(symlink attack),
+      导致我们把截图/页面结构写到攻击者能读的位置、或覆盖其它文件。
+      本项目是公开 sample —— 客户会照抄这个模式,所以这里做对更重要。
+    覆盖方式:环境变量 QUICK_OUT_DIR,或命令行显式传路径(接口未变)。
+    """
+    d = os.environ.get("QUICK_OUT_DIR") or os.path.join(
+        os.path.expanduser("~"), ".cache", "quick-control")
+    os.makedirs(d, mode=0o700, exist_ok=True)
+    return d
+
+
+def _out(name: str) -> str:
+    """把一个默认文件名解析成用户私有目录下的绝对路径。"""
+    return os.path.join(_out_dir(), name)
+
+
 PORT = os.environ.get("QUICK_CDP_PORT", "9333")
 CDP = f"http://127.0.0.1:{PORT}"
 APP = "/Applications/Amazon Quick.app/Contents/MacOS/Amazon Quick"
@@ -125,12 +145,12 @@ def status():
             "model":next((l for l in lines if l in("Quick","Smart","Fast","Balanced")),"?")},ensure_ascii=False))
     finally: b.close();pw.stop()
 
-def screenshot(path="/tmp/quick.png"):
+def screenshot(path=_out("quick.png")):
     pw,b,pg=_page()
     try: pg.screenshot(path=path); print(f"✓ 截图 → {path}")
     finally: b.close();pw.stop()
 
-def do_map(path="/tmp/quick_screen.json"):
+def do_map(path=_out("quick_screen.json")):
     pw,b,pg=_page()
     try:
         d=pg.evaluate(MAPJS); json.dump(d,open(path,"w"),ensure_ascii=False,indent=1)
@@ -607,8 +627,8 @@ def main():
         return a[a.index(flag)+1] if flag in a and a.index(flag)+1<len(a) else d
     if c=="ensure": ensure()
     elif c=="status": status()
-    elif c=="screenshot": screenshot(a[0] if a and not a[0].startswith("-") else "/tmp/quick.png")
-    elif c=="map": do_map(a[0] if a else "/tmp/quick_screen.json")
+    elif c=="screenshot": screenshot(a[0] if a and not a[0].startswith("-") else _out("quick.png"))
+    elif c=="map": do_map(a[0] if a else _out("quick_screen.json"))
     elif c in ("send","ask"): send(a[0], wait=not opt("--no-wait"))
     elif c=="type": type_only(a[0])
     elif c=="clear-input": clear_input()
