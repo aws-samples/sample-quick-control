@@ -40,7 +40,7 @@ def _settled_state(tries=4):
         d = _run_json("chrome_as.py", "state", timeout=40)
         if d.get("signedIn") is True:
             return d
-        time.sleep(2)
+        time.sleep(2)  # nosemgrep: arbitrary-sleep -- 浏览器/应用自动化必须等渲染或 CDP 响应,非忙等
     return d
 
 

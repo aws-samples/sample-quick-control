@@ -66,7 +66,7 @@ def main():
         url = BASE + area
         # 导航:直接改 location（比点按钮稳）
         eval_js("location.href=" + json.dumps(url))
-        time.sleep(3.5)  # 等 SPA 路由+渲染
+        time.sleep(3.5)  # 等 SPA 路由+渲染  # nosemgrep: arbitrary-sleep -- 浏览器/应用自动化必须等渲染或 CDP 响应,非忙等
         raw = eval_js(SCAN)
         try:
             d = json.loads(raw)

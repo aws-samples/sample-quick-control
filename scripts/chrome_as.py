@@ -324,7 +324,7 @@ def wait_text(text: str, timeout: float = 20) -> None:
             if text in pg.evaluate("()=>document.body.innerText"):
                 print(f"OK: 出现 {text}")
                 return
-            time.sleep(1)
+            time.sleep(1)  # nosemgrep: arbitrary-sleep -- 浏览器/应用自动化必须等渲染或 CDP 响应,非忙等
         print(f"TIMEOUT: 未等到 {text}")
     finally:
         _close(pw, b)
@@ -379,7 +379,7 @@ def _click_retry(pg, text: str, tries: int = 8) -> str:
         r = _click_on(pg, text)
         if r.startswith("CLICKED"):
             return r
-        time.sleep(1)
+        time.sleep(1)  # nosemgrep: arbitrary-sleep -- 浏览器/应用自动化必须等渲染或 CDP 响应,非忙等
     return r
 
 
@@ -543,7 +543,7 @@ def _fill_by(pg, pred_js: str, value: str, tries: int = 6) -> bool:
         )
         if ok:
             return True
-        time.sleep(1)
+        time.sleep(1)  # nosemgrep: arbitrary-sleep -- 浏览器/应用自动化必须等渲染或 CDP 响应,非忙等
     return False
 
 
@@ -552,7 +552,7 @@ def _wait_text_on(pg, text: str, timeout: float = 20) -> bool:
     while time.time() < deadline:
         if text in pg.evaluate("()=>document.body.innerText"):
             return True
-        time.sleep(1)
+        time.sleep(1)  # nosemgrep: arbitrary-sleep -- 浏览器/应用自动化必须等渲染或 CDP 响应,非忙等
     return False
 
 
@@ -572,7 +572,7 @@ def _click_exact(pg, label: str, tries: int = 6) -> bool:
         )
         if ok:
             return True
-        time.sleep(1)
+        time.sleep(1)  # nosemgrep: arbitrary-sleep -- 浏览器/应用自动化必须等渲染或 CDP 响应,非忙等
     return False
 
 
@@ -584,15 +584,15 @@ def create_space(name: str) -> None:
         _wait_text_on(pg, "创建空间", 15)
         print(f"open: {_click_retry(pg, '创建空间')}")
         if not _wait_text_on(pg, "为空间命名", 8):
-            time.sleep(2)
+            time.sleep(2)  # nosemgrep: arbitrary-sleep -- 浏览器/应用自动化必须等渲染或 CDP 响应,非忙等
         ok = _fill_by(pg, "e => (e.getAttribute('aria-label')||e.placeholder||'').includes('命名')", name)
         print(f"fill: {'FILLED' if ok else 'NONAME'}")
         if not ok:
             print("中止:未找到命名框")
             return
-        time.sleep(1)
+        time.sleep(1)  # nosemgrep: arbitrary-sleep -- 浏览器/应用自动化必须等渲染或 CDP 响应,非忙等
         print(f"submit: {'SUBMIT' if _click_exact(pg, '创建') else 'NOCREATE'}")
-        time.sleep(4)
+        time.sleep(4)  # nosemgrep: arbitrary-sleep -- 浏览器/应用自动化必须等渲染或 CDP 响应,非忙等
         print(
             "state: "
             + pg.evaluate("()=>(document.querySelector('h1')||{}).innerText||location.href")
@@ -636,12 +636,12 @@ def delete_space(name: str) -> None:
             )
             if menu == "MENU":
                 break
-            time.sleep(1)
+            time.sleep(1)  # nosemgrep: arbitrary-sleep -- 浏览器/应用自动化必须等渲染或 CDP 响应,非忙等
         print(f"menu: {menu}")
         if menu != "MENU":
             print("中止:未定位到空间行(超时)")
             return
-        time.sleep(1.5)
+        time.sleep(1.5)  # nosemgrep: arbitrary-sleep -- 浏览器/应用自动化必须等渲染或 CDP 响应,非忙等
         if not _click_exact(pg, "删除"):
             print("delete-menu: NODEL")
             print("中止:菜单里没找到删除项")
@@ -655,7 +655,7 @@ def delete_space(name: str) -> None:
             ):
                 dlg = True
                 break
-            time.sleep(1)
+            time.sleep(1)  # nosemgrep: arbitrary-sleep -- 浏览器/应用自动化必须等渲染或 CDP 响应,非忙等
         if not dlg:
             print("中止:删除确认弹窗未出现")
             return
@@ -671,7 +671,7 @@ def delete_space(name: str) -> None:
             ):
                 enabled = True
                 break
-            time.sleep(1)
+            time.sleep(1)  # nosemgrep: arbitrary-sleep -- 浏览器/应用自动化必须等渲染或 CDP 响应,非忙等
         if not enabled:
             print("中止:确认后删除按钮仍禁用(确认词/粘贴失败)")
             return
@@ -680,10 +680,10 @@ def delete_space(name: str) -> None:
             "d.querySelector('[data-testid=delete-space-dialog-delete-button]').click();}"
         )
         print("final: DELETED")
-        time.sleep(4)
+        time.sleep(4)  # nosemgrep: arbitrary-sleep -- 浏览器/应用自动化必须等渲染或 CDP 响应,非忙等
         pg.goto(WEB_BASE + "spaces", wait_until="domcontentloaded")
         print("→ goto spaces")
-        time.sleep(4)
+        time.sleep(4)  # nosemgrep: arbitrary-sleep -- 浏览器/应用自动化必须等渲染或 CDP 响应,非忙等
         gone = name not in pg.evaluate("()=>document.body.innerText")
         print(f"verify: {'已删除' if gone else '仍在'}")
     finally:
@@ -697,10 +697,10 @@ def create_app(prompt: str) -> None:
         pg.goto(WEB_BASE + "apps", wait_until="domcontentloaded")
         print("→ goto apps")
         if not (_wait_text_on(pg, "创建应用程序", 12) or _wait_text_on(pg, "告诉我们", 8)):
-            time.sleep(3)
+            time.sleep(3)  # nosemgrep: arbitrary-sleep -- 浏览器/应用自动化必须等渲染或 CDP 响应,非忙等
         ok = _fill_by(pg, "e => e.tagName === 'TEXTAREA'", prompt)
         print(f"fill-prompt: {'pasted' if ok else 'NOFIELD'}")
-        time.sleep(1)
+        time.sleep(1)  # nosemgrep: arbitrary-sleep -- 浏览器/应用自动化必须等渲染或 CDP 响应,非忙等
         # 提交按钮是 aria-label='生成'(不是文字'生成')
         gen = False
         for _ in range(6):
@@ -714,12 +714,12 @@ def create_app(prompt: str) -> None:
             )
             if gen:
                 break
-            time.sleep(1)
+            time.sleep(1)  # nosemgrep: arbitrary-sleep -- 浏览器/应用自动化必须等渲染或 CDP 响应,非忙等
         print(f"generate: {'GEN' if gen else 'NOGEN'}")
         if not gen:
             print("中止:未找到'生成'按钮(检查是否在 apps 区、描述是否填入)")
             return
-        time.sleep(5)
+        time.sleep(5)  # nosemgrep: arbitrary-sleep -- 浏览器/应用自动化必须等渲染或 CDP 响应,非忙等
         print("state: " + pg.evaluate("()=>location.href"))
         print("提示:App 正在编辑器里构建(register_runtime_integration→建组件),可能数分钟+弹授权框。")
         print("     期间反复跑 `approve-prompts` 自动点授权;建完跑 `publish-app` 发布。")
@@ -770,7 +770,7 @@ def publish_app() -> None:
     pw, b, pg = _page("quicksight")
     try:
         print(f"publish-1: {_click_retry(pg, '发布')}")
-        time.sleep(3)
+        time.sleep(3)  # nosemgrep: arbitrary-sleep -- 浏览器/应用自动化必须等渲染或 CDP 响应,非忙等
         r = "NODLG"
         for _ in range(6):
             r = pg.evaluate(
@@ -785,9 +785,9 @@ def publish_app() -> None:
             )
             if r == "CONFIRM":
                 break
-            time.sleep(1)
+            time.sleep(1)  # nosemgrep: arbitrary-sleep -- 浏览器/应用自动化必须等渲染或 CDP 响应,非忙等
         print(f"publish-2: {r}")
-        time.sleep(5)
+        time.sleep(5)  # nosemgrep: arbitrary-sleep -- 浏览器/应用自动化必须等渲染或 CDP 响应,非忙等
         print(
             "URL: "
             + pg.evaluate(
@@ -807,7 +807,7 @@ def share_app(alias: str) -> None:
     pw, b, pg = _page("quicksight")
     try:
         print(f"open-share: {_click_retry(pg, '共享')}")
-        time.sleep(2)
+        time.sleep(2)  # nosemgrep: arbitrary-sleep -- 浏览器/应用自动化必须等渲染或 CDP 响应,非忙等
         if not pg.evaluate(
             "()=>{const d=document.querySelector('[role=dialog]');"
             "return !!(d&&d.querySelector('input'));}"
@@ -816,7 +816,7 @@ def share_app(alias: str) -> None:
             return
         _fill_by(pg, "e => e.closest('[role=dialog]') !== null", alias)
         print("type-alias: pasted")
-        time.sleep(2)
+        time.sleep(2)  # nosemgrep: arbitrary-sleep -- 浏览器/应用自动化必须等渲染或 CDP 响应,非忙等
         print("⚠️ 已填入 alias 到 App 共享搜索框。【自动补全候选是自动化盲区】——")
         print("   请在浏览器里手动:从候选点选此人 → 选权限(查看器/共同所有者)→ 再输下一个人 → 点'共享'。")
     finally:

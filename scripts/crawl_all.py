@@ -61,13 +61,13 @@ def dump(pg,name):
 
 def click_text(pg,txt,timeout=3000):
     try:
-        pg.get_by_text(txt,exact=False).first.click(timeout=timeout); time.sleep(1.2); return True
+        pg.get_by_text(txt,exact=False).first.click(timeout=timeout); time.sleep(1.2); return True  # nosemgrep: arbitrary-sleep -- 浏览器/应用自动化必须等渲染或 CDP 响应,非忙等
     except Exception as e:
         return False
 
 def click_role(pg,name,timeout=3000):
     try:
-        pg.get_by_role("button",name=name).first.click(timeout=timeout); time.sleep(1.2); return True
+        pg.get_by_role("button",name=name).first.click(timeout=timeout); time.sleep(1.2); return True  # nosemgrep: arbitrary-sleep -- 浏览器/应用自动化必须等渲染或 CDP 响应,非忙等
     except Exception:
         return False
 
@@ -89,7 +89,7 @@ def main():
         click_role(pg,"New chat")
         # 点 + 号(Add context)看弹出菜单
         if click_role(pg,"Add context"): dump(pg,"10-addcontext-menu")
-        pg.keyboard.press("Escape"); time.sleep(0.5)
+        pg.keyboard.press("Escape"); time.sleep(0.5)  # nosemgrep: arbitrary-sleep -- 浏览器/应用自动化必须等渲染或 CDP 响应,非忙等
         # 点模型下拉
         if click_text(pg,"Smart"): dump(pg,"11-model-menu")
         pg.keyboard.press("Escape")

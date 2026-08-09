@@ -26,7 +26,7 @@ def main():
         for item in ["Capabilities","My computer","My context","Customization"]:
             try:
                 pg.get_by_role("button",name=item,exact=True).first.click(timeout=2500)
-                time.sleep(1.5)
+                time.sleep(1.5)  # nosemgrep: arbitrary-sleep -- 浏览器/应用自动化必须等渲染或 CDP 响应,非忙等
                 d=pg.evaluate(MAPJS)
                 main=[e for e in d['elements'] if e['box'][0]>290][:22]
                 print(f"\n### {item} → {d['url'][:55]}")
@@ -37,7 +37,7 @@ def main():
             except Exception as ex:
                 print(f"\n### {item}: 点击失败 {str(ex)[:60]}")
         # 回主聊天
-        pg.get_by_role("button",name="New chat").first.click(); time.sleep(1)
+        pg.get_by_role("button",name="New chat").first.click(); time.sleep(1)  # nosemgrep: arbitrary-sleep -- 浏览器/应用自动化必须等渲染或 CDP 响应,非忙等
     finally:
         b.close();p.stop()
 

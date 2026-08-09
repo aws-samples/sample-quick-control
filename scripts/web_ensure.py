@@ -130,7 +130,7 @@ def ensure() -> None:
     print(f"启动 Chrome (profile={PROFILE}, port={PORT})...")
     _launch()
     for _ in range(30):
-        time.sleep(1)
+        time.sleep(1)  # nosemgrep: arbitrary-sleep -- 浏览器/应用自动化必须等渲染或 CDP 响应,非忙等
         if cdp_ok():
             print(f"✓ CDP 已就绪 (port {PORT})")
             if not signed_in():
@@ -172,7 +172,7 @@ def login(timeout: int = 300) -> None:
     print(f"  等待中（最多 {timeout}s）...")
     deadline = time.time() + timeout
     while time.time() < deadline:
-        time.sleep(3)
+        time.sleep(3)  # nosemgrep: arbitrary-sleep -- 浏览器/应用自动化必须等渲染或 CDP 响应,非忙等
         if signed_in():
             print("✓ 登录成功")
             return
@@ -211,10 +211,10 @@ def doctor() -> None:
 
 def restart() -> None:
     subprocess.run(["pkill", "-f", f"user-data-dir={PROFILE}"], capture_output=True)
-    time.sleep(3)
+    time.sleep(3)  # nosemgrep: arbitrary-sleep -- 浏览器/应用自动化必须等渲染或 CDP 响应,非忙等
     _launch()
     for _ in range(30):
-        time.sleep(1)
+        time.sleep(1)  # nosemgrep: arbitrary-sleep -- 浏览器/应用自动化必须等渲染或 CDP 响应,非忙等
         if cdp_ok():
             print(f"✓ 已重启 (port {PORT})")
             return

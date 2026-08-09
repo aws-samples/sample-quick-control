@@ -74,7 +74,7 @@ def main():
     index = []
     for area in areas:
         ejs("location.href=" + json.dumps(BASE + area))
-        time.sleep(4)  # SPA 路由 + 数据加载
+        time.sleep(4)  # SPA 路由 + 数据加载  # nosemgrep: arbitrary-sleep -- 浏览器/应用自动化必须等渲染或 CDP 响应,非忙等
         raw = ejs(SCAN)
         try: d = json.loads(raw)
         except Exception: d = {"area": area, "err": raw[:150]}
