@@ -1,0 +1,69 @@
+# gitleaks configuration - allowlist for PUBLIC, NON-SECRET high-entropy strings.
+# gitleaks flags any high-entropy string as "generic-api-key" /
+# "square-access-token": blockchain addresses, transaction hashes, EIP-712
+# typehashes, ECDSA signature r/s components, encoding alphabets and dependency
+# lockfile integrity hashes are all PUBLIC data, never secrets.
+#
+# THE TRAP THAT COSTS AN EXTRA RESCAN ROUND:
+#   allowlist "regexes" are matched against the DETECTED SECRET STRING, not
+#   against the variable name and not against the surrounding source line.
+#   An entry like '''KEY_ALPHABET''' therefore does NOTHING - you must allowlist
+#   the alphabet literal itself. Always open the Probe finding, read the matched
+#   string, and write a regex for THAT literal.
+#
+# SEMANTIC JUDGEMENT IS YOURS:
+#   scanners cannot tell a public on-chain value (address, tx hash, signature
+#   r/s) from a private key - only you can. Read every matched string before
+#   allowlisting it. Real secrets must be REMOVED (and rotated), never masked.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Public, non-secret constants (chain data, lockfile hashes)"
+regexes = []
+paths = [
+  # Dependency lockfiles: package integrity hashes, not credentials.
+  '''uv\.lock''',
+]
+
+# ---------------------------------------------------------------------------
+# CANDIDATES - commented on purpose. Uncomment ONLY after reading the actual
+# matched string in the Probe finding and confirming it is public.
+# ---------------------------------------------------------------------------
+# DANGER: 0x + 64 hex is ALSO exactly the shape of an EVM / secp256k1
+#   PRIVATE KEY. The pre-publish scan does NOT detect a bare 64-hex private
+#   key, so this entry can hide real key material. Uncomment only after
+#   reading every matched string and confirming none of them is a key.
+#   Legitimate 32-byte values: tx hashes, EIP-712 typehashes,
+#   DOMAIN_SEPARATOR, nonces, ECDSA signature r/s - all public on-chain.
+#   '''0x[0-9a-fA-F]{64}\b''',
+#
+# base58 addresses (Solana / Tron / NEAR token + account addresses), public:
+#   e.g. a Solana mint or a Tron account address.
+#   '''\b[1-9A-HJ-NP-Za-km-z]{32,44}\b''',
+#
+# Encoding alphabet literals (base62 / base58 character sets). Remember the
+# trap above: allowlist the LITERAL, not the constant name.
+#   '''[A-Za-z]*ABCDEFGHIJKLMNOPQRSTUVWXYZ[A-Za-z0-9]*''',
+#   '''123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz''',
+#
+# Public signer prefixes (DER / ed25519) - public key framing, not keys:
+#   '''[A-Z_]*_DER_PREFIX''',
+#   '''ED25519_PREFIX''',
+#
+# Idempotency keys / demo fixtures - non-secret dummy strings:
+#   '''idem-key-[a-z0-9-]+''',
+#
+# Whole-path exemptions (use sparingly - a path exemption hides EVERYTHING
+# in that file, including a real secret added later):
+#   '''test/fixtures/.*''',
+#   '''uv\.lock''',            # only if this repo ships a uv lockfile
+#   '''pnpm-lock\.yaml''',     # only if this repo ships a pnpm lockfile
+#
+# Tip: don't use AKIA-prefixed dummy strings in tests (they trip scanners);
+#      use something like test-akid instead.
+#
+# Iterate and verify - never guess:
+#   1. edit this file  2. push to GitLab  3. wait for the Probe rescan
+#   4. read the remaining ERROR findings  5. repeat until Critical = 0
