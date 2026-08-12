@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security issue
+    url: https://aws.amazon.com/security/vulnerability-reporting/
+    about: Please report security issues here, not in public GitHub issues.
