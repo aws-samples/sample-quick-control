@@ -1,0 +1,102 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1420 890" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" role="img" aria-label="sample-quick-control v2.0 web-channel control flow: ensure → configure the start URL → launch the CDP instance → log in by hand in the browser → drive with chrome_as → verify with a screenshot">
+<title>Web-channel control flow · from zero to drivable (human gates vs automated steps)</title>
+<desc>Eight steps: ① web_ensure.py ensure ② read QUICK_WEB_BASE / QUICK_WEB_ACCOUNT and friends to build the start URL (no concrete account is hardcoded) ③ launch persistent-profile Chrome with :9445 ④ poll /json/version until the discovery layer answers ⑤ log in by hand in that Chrome window (HUMAN GATE — unattended runs stop here) ⑥ web_ensure.py login polls signed_in (the URL no longer matches QUICK_UNAUTH_MARKERS) ⑦ chrome_as.py drives goto/click/fill/list ⑧ verify with screenshot or dump. The session lives in the persistent profile, so restarting the CDP instance skips ⑤⑥. Failure branch: leaving the account placeholder unset parks you on an error page.</desc>
+<defs>
+<pattern id="grid" width="34" height="34" patternUnits="userSpaceOnUse"><path d="M34 0 H0 V34" fill="none" stroke="#EAEFF6" stroke-width="1"/></pattern>
+<marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M1 1 L9 5 L1 9" fill="none" stroke="context-stroke" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></marker>
+<style>@media (prefers-reduced-motion: no-preference){.flow{stroke-dasharray:6 6;animation:dm .8s linear infinite}.flowb{stroke-dasharray:6 6;animation:dmb .8s linear infinite}.gate{animation:gw 1.6s ease-in-out infinite}.gatebox{animation:go 1.6s ease-in-out infinite}}@keyframes dm{to{stroke-dashoffset:-12}}@keyframes dmb{to{stroke-dashoffset:12}}@keyframes gw{0%,100%{stroke-width:2.2}50%{stroke-width:3.6}}@keyframes go{0%,100%{stroke-opacity:.5}50%{stroke-opacity:1}}</style>
+</defs>
+<rect width="1420" height="890" fill="#FBFCFE"/><rect width="1420" height="890" fill="url(#grid)"/>
+<text x="40" y="46" font-size="21" font-weight="800" fill="#16202E">Web-channel control flow · from zero to drivable (automated steps vs human gates)</text>
+<text x="40" y="68" font-size="12" fill="#5A6B7B">web_ensure ensure → resolve the start URL (env vars) → launch persistent-profile Chrome on :9445 → login (log in by hand, once, in that window) → drive with chrome_as.py → verify via screenshot / dump</text>
+<rect x="1300" y="26" width="80" height="26" rx="13" fill="#EEF2FF" stroke="#4F46E5" stroke-width="1.4"/>
+<text x="1340" y="44" text-anchor="middle" font-size="11.5" font-weight="800" fill="#4338CA">v2.0.0</text>
+<rect x="55" y="100" width="230" height="48" rx="10" fill="#FFFFFF" stroke="#64748B" stroke-width="1.5"/>
+<text x="170" y="121" text-anchor="middle" font-size="12.5" font-weight="700" fill="#334155">Caller</text>
+<text x="170" y="137" text-anchor="middle" font-size="9.5" fill="#5A6B7B">you / AI agent · manual or scripted</text>
+<line x1="170" y1="148" x2="170" y2="694" stroke="#CBD5E1" stroke-width="1.4" stroke-dasharray="3 6"/>
+<rect x="405" y="100" width="230" height="48" rx="10" fill="#FFFFFF" stroke="#4F46E5" stroke-width="1.5"/>
+<text x="520" y="121" text-anchor="middle" font-size="12.5" font-weight="700" fill="#4338CA">web_ensure.py</text>
+<text x="520" y="137" text-anchor="middle" font-size="9.5" fill="#5A6B7B">ensure / status / login / doctor / restart</text>
+<line x1="520" y1="148" x2="520" y2="694" stroke="#CBD5E1" stroke-width="1.4" stroke-dasharray="3 6"/>
+<rect x="785" y="100" width="230" height="48" rx="10" fill="#FFFFFF" stroke="#00A4A6" stroke-width="1.5"/>
+<text x="900" y="121" text-anchor="middle" font-size="12.5" font-weight="700" fill="#0B7E7F">Google Chrome · CDP :9445</text>
+<text x="900" y="137" text-anchor="middle" font-size="9.5" fill="#5A6B7B">~/.chrome-cdp-profile (persistent profile)</text>
+<line x1="900" y1="148" x2="900" y2="694" stroke="#CBD5E1" stroke-width="1.4" stroke-dasharray="3 6"/>
+<rect x="1155" y="100" width="230" height="48" rx="10" fill="#FFFFFF" stroke="#E7157B" stroke-width="1.5"/>
+<text x="1270" y="121" text-anchor="middle" font-size="12.5" font-weight="700" fill="#B21667">Your identity provider (IdP)</text>
+<text x="1270" y="137" text-anchor="middle" font-size="9.5" fill="#5A6B7B">sign-in page / MFA · done by hand in-browser</text>
+<line x1="1270" y1="148" x2="1270" y2="694" stroke="#CBD5E1" stroke-width="1.4" stroke-dasharray="3 6"/>
+<path class="flow" d="M 176 196 H 514" fill="none" stroke="#1D4ED8" stroke-width="2.0" marker-end="url(#ah)"/>
+<rect x="177.0" y="176.0" width="296.0" height="15.5" rx="3" fill="#FBFCFE" opacity="0.94"/>
+<text x="182.0" y="188.0" font-size="10.5" font-weight="700" fill="#48586a">① web_ensure.py ensure — one self-healing command</text>
+<path d="M 526 232 H 598 V 264 H 532" fill="none" stroke="#B45309" stroke-width="1.6" stroke-dasharray="4 4" marker-end="url(#ah)"/>
+<rect x="603.0" y="228.0" width="488.0" height="15.5" rx="3" fill="#FBFCFE" opacity="0.94"/>
+<text x="608.0" y="240.0" font-size="10.5" font-weight="700" fill="#B45309">② Resolve the start URL: QUICK_WEB_BASE, or QUICK_WEB_REGION + QUICK_WEB_ACCOUNT</text>
+<rect x="603.0" y="245.0" width="573.0" height="14.5" rx="3" fill="#FBFCFE" opacity="0.94"/>
+<text x="608.0" y="256.0" font-size="9.5" fill="#5A6B7B">The code ships a placeholder account name only — accounts differ per person and per org, so none is ever hardcoded</text>
+<rect x="608" y="262" width="56" height="16" rx="8" fill="#FEF3C7" stroke="#B45309" stroke-width="1"/>
+<text x="636" y="274" text-anchor="middle" font-size="9" font-weight="700" fill="#B45309">one-time</text>
+<rect x="670" y="262" width="248" height="16" rx="8" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1"/>
+<text x="794" y="274" text-anchor="middle" font-size="9" fill="#5A6B7B">QUICK_UNAUTH_MARKERS overrides the signed-out test</text>
+<rect x="529.0" y="284.0" width="392.0" height="15.5" rx="3" fill="#FBFCFE" opacity="0.94"/>
+<text x="534.0" y="296.0" font-size="10.5" font-weight="700" fill="#48586a">③ Launch persistent-profile Chrome: --remote-debugging-port=9445</text>
+<rect x="529.0" y="298.0" width="378.0" height="14.5" rx="3" fill="#FBFCFE" opacity="0.94"/>
+<text x="534.0" y="309.0" font-size="9.5" fill="#5A6B7B">--user-data-dir=~/.chrome-cdp-profile (isolated from your everyday browser)</text>
+<path class="flow" d="M 526 314 H 894" fill="none" stroke="#1D4ED8" stroke-width="2.0" marker-end="url(#ah)"/>
+<path class="flowb" d="M 894 356 H 526" fill="none" stroke="#0F766E" stroke-width="2.0" marker-end="url(#ah)"/>
+<rect x="529.0" y="336.5" width="618.0" height="15.0" rx="3" fill="#FBFCFE" opacity="0.94"/>
+<text x="534.0" y="348.0" font-size="10" fill="#0F766E">④ Poll /json/version (up to 30s) → ✓ ready only when the discovery layer really answers (not just a LISTENing port)</text>
+<rect x="695.0" y="374.5" width="612.0" height="15.0" rx="3" fill="#FBFCFE" opacity="0.94"/>
+<text x="700.0" y="386.0" font-size="10" font-weight="700" fill="#0369A1">Open the start URL → if signed out, your IdP takes over (the URL matches a signed-out marker → signed_in()=false)</text>
+<path d="M 906 406 H 1264" fill="none" stroke="#0369A1" stroke-width="1.6" stroke-dasharray="2 5" marker-end="url(#ah)" opacity="0.85"/>
+<rect class="gatebox" x="60" y="434" width="1330" height="62" rx="10" fill="rgba(231,21,123,0.05)" stroke="#E7157B" stroke-width="1.8" stroke-dasharray="7 5"/>
+<rect x="60" y="434" width="10" height="62" rx="4" fill="#E7157B"/>
+<path class="gate flow" d="M 176 474 H 1264" fill="none" stroke="#E7157B" stroke-width="2.2" marker-end="url(#ah)"/>
+<rect x="181.0" y="451.5" width="436.0" height="16.0" rx="3" fill="#FBFCFE" opacity="0.94"/>
+<text x="186.0" y="464.0" font-size="11" font-weight="700" fill="#B21667">⑤ Human: finish the login inside this Chrome window (never automated)</text>
+<g transform="translate(946,456)"><circle cx="8" cy="8" r="6.4" fill="none" stroke="#E7157B" stroke-width="2.2"/><path d="M14 8 H30 M25 8 V13 M29 8 V13" fill="none" stroke="#E7157B" stroke-width="2.2" stroke-linecap="round"/></g>
+<rect x="981.0" y="456.0" width="386.0" height="15.5" rx="3" fill="#FBFCFE" opacity="0.94"/>
+<text x="986.0" y="468.0" font-size="10.5" font-weight="700" fill="#B21667">HUMAN GATE · unattended stops here (credentials stay in-browser)</text>
+<path class="flowb" d="M 1264 528 H 526" fill="none" stroke="#0F766E" stroke-width="1.8" marker-end="url(#ah)"/>
+<rect x="529.0" y="508.5" width="692.0" height="15.0" rx="3" fill="#FBFCFE" opacity="0.94"/>
+<text x="534.0" y="520.0" font-size="10" fill="#0F766E">⑥ web_ensure.py login polls signed_in() (the URL no longer matches QUICK_UNAUTH_MARKERS) → ✓ signed in; session persists from here</text>
+<rect x="181.0" y="550.0" width="530.0" height="15.5" rx="3" fill="#FBFCFE" opacity="0.94"/>
+<text x="186.0" y="562.0" font-size="10.5" font-weight="700" fill="#48586a">⑦ chrome_as.py drives (35 commands · 11 areas): goto / click / fill / list / screenshot</text>
+<rect x="181.0" y="564.0" width="558.0" height="14.5" rx="3" fill="#FBFCFE" opacity="0.94"/>
+<text x="186.0" y="575.0" font-size="9.5" fill="#5A6B7B">Over CDP, locator.fill() just works — writes run silently in the background: no tab foregrounding, no clipboard</text>
+<path class="flow" d="M 176 582 H 894" fill="none" stroke="#1D4ED8" stroke-width="2.0" marker-end="url(#ah)" marker-start="url(#ah)"/>
+<path class="flowb" d="M 894 634 H 176" fill="none" stroke="#0F766E" stroke-width="2.0" marker-end="url(#ah)"/>
+<rect x="181.0" y="614.5" width="697.0" height="15.0" rx="3" fill="#FBFCFE" opacity="0.94"/>
+<text x="186.0" y="626.0" font-size="10" fill="#0F766E">⑧ Verify: screenshot /tmp/x.png (native CDP capture — impossible in v1.x without Screen Recording permission) or dump the structure</text>
+<path d="M 900 658 V 682 H 120 V 598" fill="none" stroke="#94A3B8" stroke-width="1.4" stroke-dasharray="4 5" marker-end="url(#ah)"/>
+<rect x="135.0" y="665.0" width="652.0" height="14.5" rx="3" fill="#FBFCFE" opacity="0.94"/>
+<text x="140.0" y="676.0" font-size="9.5" fill="#64748B">The session lives in the persistent profile: after restarting the CDP instance, skip ⑤⑥ and resume at ⑦ (②③ only need ensure once)</text>
+<circle r="4.0" fill="#1D4ED8" opacity="0"><animateMotion dur="12s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;0.0010;0.0944;1" path="M 176 196 H 514"/><animate attributeName="opacity" dur="12s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;0.0010;0.0944"/></circle>
+<circle r="4.0" fill="#1D4ED8" opacity="0"><animateMotion dur="12s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;0.2222;0.3167;1" path="M 526 314 H 894"/><animate attributeName="opacity" dur="12s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;0.2222;0.3167"/></circle>
+<circle r="3.6" fill="#0F766E" opacity="0"><animateMotion dur="12s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;0.3333;0.4278;1" path="M 894 356 H 526"/><animate attributeName="opacity" dur="12s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;0.3333;0.4278"/></circle>
+<circle r="3.4" fill="#0369A1" opacity="0"><animateMotion dur="12s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;0.4444;0.5389;1" path="M 906 406 H 1264"/><animate attributeName="opacity" dur="12s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;0.4444;0.5389"/></circle>
+<circle r="4.4" fill="#E7157B" opacity="0"><animateMotion dur="12s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;0.5556;0.6500;1" path="M 176 474 H 1264"/><animate attributeName="opacity" dur="12s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;0.5556;0.6500"/></circle>
+<circle r="3.6" fill="#0F766E" opacity="0"><animateMotion dur="12s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;0.6667;0.7611;1" path="M 1264 528 H 526"/><animate attributeName="opacity" dur="12s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;0.6667;0.7611"/></circle>
+<circle r="4.0" fill="#1D4ED8" opacity="0"><animateMotion dur="12s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;0.7778;0.8722;1" path="M 176 582 H 894"/><animate attributeName="opacity" dur="12s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;0.7778;0.8722"/></circle>
+<circle r="3.4" fill="#0F766E" opacity="0"><animateMotion dur="12s" repeatCount="indefinite" calcMode="linear" keyPoints="1;1;0;0" keyTimes="0;0.7778;0.8722;1" path="M 176 582 H 894"/><animate attributeName="opacity" dur="12s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;0.7778;0.8722"/></circle>
+<circle r="3.6" fill="#0F766E" opacity="0"><animateMotion dur="12s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;0.8889;0.9833;1" path="M 894 634 H 176"/><animate attributeName="opacity" dur="12s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;0.8889;0.9833"/></circle>
+<rect x="60" y="714" width="1330" height="80" rx="10" fill="rgba(221,52,76,0.045)" stroke="#DD344C" stroke-width="1.5" stroke-dasharray="6 4"/>
+<rect x="60" y="714" width="10" height="80" rx="4" fill="#DD344C"/>
+<text x="86" y="736" font-size="11.5" font-weight="700" fill="#B3202F">Failure branch: CDP ready ≠ drivable — if ② still holds the placeholder account, or ⑤ (the manual login) never completed, signed_in() stays false and ⑦ hunts for elements on an error page:</text>
+<rect x="86" y="744" width="700" height="18" rx="4" fill="#FFFFFF" stroke="#F3C6CC" stroke-width="1"/>
+<text x="96" y="757" font-size="10" fill="#B3202F">&#8220;⚠ Not signed in — run web_ensure.py login, then log in in the window that opens&#8221; (ensure's warning)</text>
+<rect x="86" y="766" width="700" height="18" rx="4" fill="#FFFFFF" stroke="#F3C6CC" stroke-width="1"/>
+<text x="96" y="779" font-size="10" fill="#B3202F">&#8220;✗ Timed out — no successful login detected&#8221; (login waited the full 300s; exit code 1)</text>
+<text x="800" y="757" font-size="10" fill="#5A6B7B">→ Check the second one first: a placeholder account in the start URL never opens your Quick space.</text>
+<text x="800" y="779" font-size="10" fill="#5A6B7B">Fix: set QUICK_WEB_ACCOUNT (or override QUICK_WEB_BASE), then run web_ensure.py doctor.</text>
+<text x="40" y="828" font-size="11" font-weight="700" fill="#16202E">Flows</text>
+<circle cx="92" cy="824" r="5" fill="#1D4ED8"/><text x="102" y="828" font-size="10.5" fill="#5A6B7B">automated · control commands →</text>
+<circle cx="280" cy="824" r="5" fill="#0F766E"/><text x="290" y="828" font-size="10.5" fill="#5A6B7B">automated · ack / read-back ←</text>
+<circle cx="462" cy="824" r="5" fill="#0369A1"/><text x="472" y="828" font-size="10.5" fill="#5A6B7B">login redirect</text>
+<circle cx="564" cy="824" r="5" fill="#B45309"/><text x="574" y="828" font-size="10.5" fill="#5A6B7B">one-time setup</text>
+<circle cx="666" cy="824" r="5" fill="#E7157B"/><text x="676" y="828" font-size="10.5" fill="#5A6B7B">human gate (pulsing)</text>
+<circle cx="800" cy="824" r="5" fill="#DD344C"/><text x="810" y="828" font-size="10.5" fill="#5A6B7B">failure branch</text>
+<text x="40" y="856" font-size="10" fill="#5A6B7B">Security boundary: this tool never touches credentials — it never reads, stores, or types a password or MFA code. Login happens only at ⑤, by your own hand in that Chrome window; the session cookie lives in your own --user-data-dir. Unattended runs get no session.</text>
+<text x="40" y="874" font-size="10" fill="#94A3B8">Overturned conclusion: v1.x blamed 404s on :9222 /json/* on "corporate policy killing DevTools discovery" — in fact the main Chrome never ran with --remote-debugging-port; :9222 was an unrelated service. Lesson: verify the target process's launch flags first.</text>
+</svg>
