@@ -741,7 +741,7 @@ def create_app(prompt: str) -> None:
             return
         time.sleep(5)  # nosemgrep: arbitrary-sleep -- 浏览器/应用自动化必须等渲染或 CDP 响应,非忙等
         print("state: " + pg.evaluate("()=>location.href"))
-        print("提示:App 正在编辑器里构建(register_runtime_integration→建组件),可能数分钟+弹授权框。")
+        print("提示:App 正在编辑器里构建(注册运行时集成→建组件),可能数分钟+弹授权框。")
         print("     期间反复跑 `approve-prompts` 自动点授权;建完跑 `publish-app` 发布。")
         print('     要改内容:`app-edit "<自然语言修改指令>"`(编辑器\'要求应用程序进行更改\'输入框)。')
     finally:

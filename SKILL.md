@@ -189,7 +189,7 @@ $C share-app "<alias>"                    # 打开共享框+填alias(⚠️候�
 1. **桌面端 chat「生成」的 App 进不了库、团队访问不到**——桌面端(quick_ctl.py `ask`)里让 Quick「做个 App」只是会话内产物,无 Create/Publish Q App 权限。**要发布到库、可共享,只能走网页版通道(现为 CDP :9445)。** 完整闭环不变:`create-app` → 反复 `approve-prompts` → 建完 `publish-app` → `share-app`。
 2. **App 提交按钮是 `aria-label='生成'`(不是文字'生成')**;编辑器里改内容用 `app-edit`(输入框 placeholder 含'更改')。
 3. **描述必须强约束,否则跑偏**:描述太泛时 Quick 会自作主张把 App 做成「文档浏览器/markdown 阅读器」。要复刻某 HTML 门户就明说「严格以 Space 里的 `<file>.html` 为唯一样板 1:1 复刻,不要自己设计布局/搜索/KPI/下钻」——纠偏也用 `app-edit` 发这句。
-4. **构建期会多次弹授权框**(register_runtime_integration 等):跑 `approve-prompts` 自动点(允许/继续/预览);它是轮询式,建 App 的几分钟里反复跑几次。
+4. **构建期会多次弹授权框**(运行时集成注册等):跑 `approve-prompts` 自动点(允许/继续/预览);它是轮询式,建 App 的几分钟里反复跑几次。
 5. **⚠️ App 共享框的自动补全:v1.x 是盲区,CDP 下待验证**。与 Space 共享框不同,App 共享搜索框的候选,v1.x `share-app` 用 JS setter / 剪贴板粘贴 / 真键盘 keystroke **四种注入都不出候选**——但这四种手段**全是 AppleScript 时代的**;CDP 下 playwright 原生输入(`fill` / `type` / `press_sequentially`)**尚未复测**,既不能照抄"盲区"结论,也不得宣称已解决。保守流程不变:`share-app` 只做「打开共享框+填 alias」,**选中候选、定权限(查看器/共同所有者)、点'共享'先按需人工在浏览器完成**,跑完提示用户手点,加完用 `dump`/eval 读共享对象列表核实。⚠️ **不得为验证此点真共享任何 App**。
 6. **SVG 不能上传进 Space**(格式不支持,报错)。要让 App 内联 SVG:把 SVG 源码打包成 `.md`(每张一个 ```svg 代码块)上传,再让 App 读该 md 内联;或建 App 时把 SVG 源码随描述给到。
 
