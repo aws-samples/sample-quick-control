@@ -3,6 +3,18 @@
 本项目所有重要变更记录于此。格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [Unreleased]
+
+### Changed
+- **README 改为英文为主入口，中文页保留可点击跳转**：原中文 README 整体移到 `README.zh-CN.md`（`git mv`，保留 blame），新的 `README.md` 是完整英文版（不是摘要，章节 1:1 对应）。两页顶部互相链接。本项目是公开 AWS sample，默认读者是国际读者。
+- **架构图与流程图出英文版**：新增 `docs/architecture.en.svg`、`docs/control-flow.en.svg`，英文 README 引用它们；中文页继续用原中文图。英文标签比中文标签像素更宽，所有背景 pill 的 `width` 与图例横向坐标据实测渲染重排，无溢出、无遮挡。
+
+### Added
+- README 显式声明**脚本 stdout 的人读消息目前是中文**（命令名 / flag / 退出码 / JSON 契约是英文且稳定）。上层剧本应分支于退出码与 JSON 字段，不要匹配消息文本。
+
+### Fixed
+- `docs/architecture.svg` 里 `quick_ctl.py · 27+ 能力` 是 v1.x 遗留计数，实际 dispatch 表为 **59** 个命令（README 正文一直写的 59 才是对的）。中英两版图均已改为 59。
+
 ## [2.0.0] - 2026-07-27
 
 **架构收敛：双目标 · 单协议。** 网页版通道底层从 AppleScript 换成 CDP，两条通道（桌面端 Electron `:9333` / 网页版 Chrome `:9445`）从此说同一种协议。触发这次迁移的不是新需求，而是**发现 v1.x 把网页通道锁在 AppleScript 上的那条技术结论是误判**（见 Fixed）。

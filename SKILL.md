@@ -16,7 +16,7 @@ description: 程序化控制本机 macOS 上的 Amazon Quick——桌面端（El
 
 ## 前提
 
-- **本 skill 以软链接方式安装**：`~/.claude/skills/amazon-quick-control` → 仓库 clone 处（如 `~/Code/sample-quick-control`）。下文命令里的 `~/.claude/skills/amazon-quick-control/scripts` 与仓库内 `scripts/` 是同一份文件，改代码即时生效。若该软链接不存在，见 README「安装」节。
+- **本 skill 以软链接方式安装**：`~/.claude/skills/amazon-quick-control` → 仓库 clone 处（如 `~/Code/sample-quick-control`）。下文命令里的 `~/.claude/skills/amazon-quick-control/scripts` 与仓库内 `scripts/` 是同一份文件，改代码即时生效。若该软链接不存在，见 [README.zh-CN.md](./README.zh-CN.md) 的「安装」节（英文版：[README.md](./README.md)）。
 - 本机已装 `/Applications/Amazon Quick.app` 且已登录。
 - Quick 必须**带调试端口运行**。skill 的 `ensure` 会自动处理（未开则重启加参数）。
 - 一律用 `uv run --with playwright`（用户全局铁律：Python 用 uv）。
