@@ -1,0 +1,41 @@
+# Internal-information denylist checked against the WORKING TREE ONLY
+# (ci.yml → hygiene job). Companion to .github/internal-terms.txt, which is
+# checked against the full history instead.
+#
+# WHY TWO TIERS
+#   internal-terms.txt  → must never exist ANYWHERE, in any blob, in any ref.
+#                         Highest impact: customer identity, enterprise identity
+#                         and device-compliance plumbing, internal infra names.
+#   this file           → must not exist at HEAD, but pre-existing occurrences
+#                         are already frozen in public history and cannot be
+#                         removed (see below). So this tier only prevents NEW
+#                         occurrences from being added.
+#
+# WHY THE EXISTING OCCURRENCES CANNOT BE REMOVED
+#   The term below appears in historical blobs that are reachable from
+#   refs/pull/1/head. A pull-request ref tracks its source branch only while
+#   that branch exists; once the branch is deleted, GitHub freezes the ref and
+#   neither a force-push nor a history rewrite can move it. That ancestry is
+#   therefore permanent. Putting the term in the full-history list would make
+#   that job unfixably red.
+#
+#   Operational lesson: when a leak has to be rewritten out of history, do it
+#   BEFORE any PR branch that references the affected commits is deleted —
+#   force-push the PR branch to a clean equivalent first, so its ref follows.
+#
+# SELF-REFERENCE TRAP
+#   Same convention as the companion file: every pattern is written so it does
+#   not literally contain the string it matches (one character in a class), and
+#   that applies to comments too. Verify with:
+#       PATF=$(mktemp); sed -e 's/#.*//' -e '/^[[:space:]]*$/d' \
+#         .github/internal-terms-head-only.txt > "$PATF"
+#       grep -inE -f "$PATF" .github/internal-terms-head-only.txt   # must be empty
+#
+# FORMAT
+#   One POSIX extended regex (ERE) per line, case-insensitive.
+
+# ── Product-internal API / call names ─────────────────────────────────────────
+# Sensitivity is low (the behaviour is observable by simply using the product's
+# UI), but a public sample should describe what the user sees rather than name
+# the internal call that causes it. Prefer neutral wording.
+register_runtime_[i]ntegration

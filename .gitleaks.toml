@@ -67,3 +67,55 @@ paths = [
 # Iterate and verify - never guess:
 #   1. edit this file  2. push to GitLab  3. wait for the Probe rescan
 #   4. read the remaining ERROR findings  5. repeat until Critical = 0
+
+# ===========================================================================
+# CUSTOM RULES — internal-information disclosure (not "secrets")
+#
+# WHY THESE EXIST
+#   gitleaks' default rules look for credentials. They do NOT flag the class of
+#   problem that actually bit this repository: internal system names, an
+#   internal browser-extension ID, an internal account name, and a real customer
+#   name, all copied verbatim from the internal repo this sample derives from.
+#   None of those is a secret, so every default rule stayed green.
+#
+# RELATIONSHIP TO CI
+#   The authoritative gate is .github/workflows/ci.yml → provenance job, which
+#   scans EVERY blob in EVERY ref (gitleaks here is typically run against the
+#   working tree / a commit range). These rules exist so a local `gitleaks
+#   detect` and any pre-commit hook catch the same thing early. Term lists are
+#   duplicated between here and .github/internal-terms.txt ON PURPOSE — gitleaks
+#   cannot read that file's format. Authoritative list is internal-terms.txt;
+#   keep the two in sync when editing either.
+#
+# SELF-REFERENCE TRAP — READ BEFORE EDITING
+#   These regexes must not literally spell what they match, or gitleaks and the
+#   provenance job will both flag this very file. One character of each term is
+#   wrapped in a character class (e.g. a pattern of the form Xxxx[y]yyy matches
+#   Xxxxyyyy without spelling it). Same rule applies to descriptions/comments.
+#   `keywords` is deliberately omitted for the same reason: gitleaks keywords
+#   must be literal strings, which would defeat the whole convention.
+# ===========================================================================
+
+[[rules]]
+id = "internal-enterprise-identity-plumbing"
+description = "Names an internal enterprise identity / device-compliance component. Public samples must not reference internal auth or compliance machinery, and must never document how to make it work under a non-standard configuration."
+regex = '''(?i)([M]idway|\bA[E]A\b|\bAC[M]E\b|\bacme[d]\b|Yubi[K]ey|idpris[m]|amazon_enterprise_[a]ccess|NativeMessaging[H]osts)'''
+tags = ["internal", "identity", "do-not-publish"]
+
+[[rules]]
+id = "internal-browser-extension-id"
+description = "Chrome extension ID of an internal enterprise-access extension. A stable identifier that ties a public repo to internal browser tooling."
+regex = '''(?i)bkbighdlgofgdhcjnhocalbkiehhpde[i]'''
+tags = ["internal", "identifier", "do-not-publish"]
+
+[[rules]]
+id = "internal-infrastructure-identifier"
+description = "Internal account / org / group name. Leaks deployment topology. Start URLs must come from QUICK_WEB_ACCOUNT / QUICK_WEB_BASE, never a hardcoded real account."
+regex = '''(?i)(amazon[b]i|gitlab\.aws\.[d]ev|aws-gcr-[w]eb3)'''
+tags = ["internal", "infrastructure", "do-not-publish"]
+
+[[rules]]
+id = "customer-identifying-name"
+description = "Real customer or engagement name, including real Space names. Highest business impact of anything in this file. Use a placeholder such as <Customer> plus a generic suffix instead."
+regex = '''(?i)(Rock[b]und|Client [3]60|Field [T]ools|Account [P]lanning|Transformation-in-[F]inance)'''
+tags = ["internal", "customer", "do-not-publish"]

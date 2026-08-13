@@ -1,0 +1,71 @@
+# Internal-information denylist for the full-history scan (ci.yml → provenance job).
+#
+# WHY THIS FILE EXISTS
+#   This repository is a public sample derived from an internal one. A previous
+#   publication attempt copied the internal baseline first and sanitized it in a
+#   follow-up commit — which left the original text permanently readable in git
+#   history even though HEAD looked clean. Scanning HEAD only cannot catch that.
+#   The provenance job therefore scans EVERY blob reachable from EVERY ref.
+#
+# SELF-REFERENCE TRAP (read this before editing)
+#   A denylist that literally spells a forbidden word would match itself and
+#   fail the build forever. Excluding this file by path is not reliable either:
+#   a blob can appear under a different path elsewhere in history. So every
+#   pattern below is written so that it does NOT literally contain the string it
+#   matches — exactly one character is wrapped in a character class, e.g. a
+#   pattern of the form  Xxxx[y]yyy  matches Xxxxyyyy without spelling it.
+#   THIS APPLIES TO COMMENTS TOO: never write a forbidden word in prose here.
+#   Verify after every edit — the following must print nothing:
+#       PATF=$(mktemp); sed -e 's/#.*//' -e '/^[[:space:]]*$/d' \
+#         .github/internal-terms.txt > "$PATF"
+#       grep -inE -f "$PATF" .github/internal-terms.txt
+#
+# FORMAT
+#   One POSIX extended regex (ERE) per line. Blank lines and #-comments are
+#   ignored. Matching is case-insensitive.
+
+# ── Enterprise device-compliance / identity plumbing ──────────────────────────
+# These name internal components, and an earlier revision of this repo went
+# further: it documented a step-by-step way to make them work under a
+# non-standard browser profile. Neither the names nor the procedure belong here.
+# Note: the first pattern below already covers any string containing it, so
+# hostname variants of it do not need their own entries.
+[M]idway
+\bA[E]A\b
+\bAC[M]E\b
+\bacme[d]\b
+Yubi[K]ey
+idpris[m]
+amazon_enterprise_[a]ccess
+NativeMessaging[H]osts
+# Chrome extension ID of the enterprise-access extension. Never publish an
+# internal extension ID — it is a stable identifier that ties this public repo
+# to internal browser tooling.
+bkbighdlgofgdhcjnhocalbkiehhpde[i]
+
+# ── Internal infrastructure identifiers ───────────────────────────────────────
+# Account / org / group names leak deployment topology. The start URL must be
+# built from QUICK_WEB_ACCOUNT / QUICK_WEB_BASE, never a hardcoded real account.
+amazon[b]i
+gitlab\.aws\.[d]ev
+aws-gcr-[w]eb3
+
+# ── Customer / engagement identity (highest business impact) ──────────────────
+# Real Space names identify customers. In docs and examples use a placeholder
+# such as  <Customer>  followed by a generic suffix — never a real account's
+# Space name, and never a real customer name in a sample command line.
+Rock[b]und
+Client [3]60
+Field [T]ools
+Account [P]lanning
+Transformation-in-[F]inance
+
+# ── NOT scanned here: product-internal API names ──────────────────────────────
+# Those live in .github/internal-terms-head-only.txt and are checked against the
+# working tree only. Reason (a hard constraint, not a preference): one such name
+# is frozen into refs/pull/1/head, whose source branch no longer exists. A PR ref
+# follows its branch only while the branch lives; once the branch is deleted the
+# ref — and every commit it reaches — can never be rewritten. Listing that term
+# here would make this job permanently red with no possible remedy, which is the
+# fastest way to get a security gate deleted by whoever hits it next.
+# LESSON: rewrite history BEFORE any PR branch referencing it disappears.

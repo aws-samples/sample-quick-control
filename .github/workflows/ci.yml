@@ -99,6 +99,26 @@ jobs:
           fi
           echo "no credential-like strings found"
 
+      # 只扫工作树的那一级内部词（存量已冻结在 refs/pull/1/head 里、无法移除，
+      # 故不能进全历史词表，否则 provenance job 永久红；见词表文件顶部说明）。
+      - name: no internal API names in working tree
+        run: |
+          F=.github/internal-terms-head-only.txt
+          test -f "$F" || { echo "::error::denylist 缺失: $F"; exit 1; }
+          sed -e 's/#.*//' -e '/^[[:space:]]*$/d' "$F" > /tmp/head_patterns
+          N=$(wc -l < /tmp/head_patterns)
+          # grep -f 空文件匹配零结果 → 会让这道门假绿。必须先断言词表非空。
+          test "$N" -ge 1 || { echo "::error::词表为空，扫描会假绿通过"; exit 1; }
+          if grep -inE -f /tmp/head_patterns "$F"; then
+            echo "::error::词表字面包含禁词（注释亦然）—— 见文件顶部 SELF-REFERENCE TRAP"
+            exit 1
+          fi
+          if git grep -inIE -f /tmp/head_patterns -- .; then
+            echo "::error::工作树含内部 API 名，请改成中性表述"
+            exit 1
+          fi
+          echo "ok: 工作树 0 命中（$N 条模式）"
+
       # v1.1.0 时 pyproject 的 version 漏更（停在 1.0.0）。这道门防止复发。
       - name: pyproject version == top CHANGELOG version
         run: |
@@ -107,3 +127,89 @@ jobs:
           echo "pyproject=$PV changelog=$CV"
           test -n "$PV" && test -n "$CV" || { echo "::error::version not parseable"; exit 1; }
           test "$PV" = "$CV" || { echo "::error::version drift: pyproject=$PV changelog=$CV"; exit 1; }
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # 全历史来源审计。
+  #
+  # 为什么不能只扫 HEAD（上面 hygiene job 的做法）：本仓库是从内部仓库派生的
+  # 公开 sample。一次发布尝试曾"先原样拷贝、再补一个脱敏 commit"——HEAD 干净、
+  # 扫描器全绿，但原文永久留在 git 历史里，任何人 clone 或按 SHA 直读即可取回。
+  # 只扫 HEAD 的门对这种模式完全无效，所以这里扫【每个 ref 可达的每个 blob】。
+  #
+  # 正确的发布姿势是：发布前先把历史压成单个干净 commit，再做第一次 push。
+  # ───────────────────────────────────────────────────────────────────────────
+  provenance:
+    name: no internal info in full history
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0          # 必须：默认浅克隆扫不到历史
+
+      - name: fetch all refs (branches + tags)
+        run: |
+          git fetch --quiet --tags origin '+refs/heads/*:refs/remotes/origin/*' || true
+          echo "refs 可达 commit 数: $(git rev-list --all --count)"
+
+      # 词表与 CI 分开存放，且每条模式都"不字面包含自己所匹配的串"
+      # （见 .github/internal-terms.txt 顶部的 SELF-REFERENCE TRAP）。
+      - name: load denylist
+        run: |
+          F=.github/internal-terms.txt
+          test -f "$F" || { echo "::error::denylist 缺失: $F"; exit 1; }
+          sed -e 's/#.*//' -e '/^[[:space:]]*$/d' "$F" > /tmp/patterns
+          N=$(wc -l < /tmp/patterns)
+          echo "载入 $N 条模式"
+          # 静默失效防线：grep -f 空文件匹配【零】结果，会让整道门假绿通过。
+          test "$N" -ge 10 || { echo "::error::词表只剩 $N 条，疑似被清空/损坏"; exit 1; }
+
+      # 自检 ①：词表不得命中自己，否则这道门永久红、必然被人为绕过。
+      - name: self-check — denylist must not match itself
+        run: |
+          if grep -inE -f /tmp/patterns .github/internal-terms.txt; then
+            echo "::error::词表字面包含了禁词（注释里也不行）—— 见文件顶部 SELF-REFERENCE TRAP"
+            exit 1
+          fi
+          echo "ok: 词表自安全"
+
+      # 自检 ②：反向验证这道门还"咬得住"。把每条模式去掉 \b 与方括号，
+      # 还原成字面串，逐条要求能被自己的词表命中。这能挡住两类静默失效：
+      #   - 有人改 grep 时丢了 -i（模式里的大写字母就再也匹配不到小写实例）
+      #   - 有人误编辑把某条模式写坏（形如 Xx[x → 永不匹配）
+      # 还原逻辑不落盘任何禁词字面串，因此本文件与日志都保持干净。
+      - name: self-check — denylist must actually match its own terms
+        run: |
+          sed -e 's/\\b//g' -e 's/\[\(.\)\]/\1/g' -e 's/\\\././g' \
+              /tmp/patterns > /tmp/fixtures
+          fail=0
+          while IFS= read -r lit; do
+            [ -z "$lit" ] && continue
+            printf '%s\n' "$lit" | grep -qiE -f /tmp/patterns || {
+              echo "::error::模式失效，无法命中自身还原串（第 $((fail+1)) 处）"
+              fail=$((fail+1))
+            }
+          done < /tmp/fixtures
+          test "$fail" -eq 0 || exit 1
+          echo "ok: $(wc -l < /tmp/fixtures) 条模式均可命中"
+
+      # 主扫描：遍历所有 ref 可达的全部 blob。含 .svg —— SVG 把敏感串放在
+      # <text> 节点里，review 只看到一张图、diff 被坐标淹没，是本类审计的盲区。
+      - name: scan every blob reachable from every ref
+        run: |
+          hits=0; scanned=0
+          while read -r sha; do
+            scanned=$((scanned+1))
+            if out=$(git cat-file -p "$sha" 2>/dev/null | grep -inE -f /tmp/patterns); then
+              path=$(git rev-list --objects --all | awk -v s="$sha" '$1==s{print $2; exit}')
+              echo "::error file=${path:-unknown}::内部信息出现在 blob $sha (path=${path:-unknown})"
+              printf '%s\n' "$out" | head -5 | sed 's/^/    /'
+              hits=$((hits+1))
+            fi
+          done < <(git rev-list --objects --all | awk 'NF>1{print $1}' | sort -u)
+          echo "已扫 $scanned 个 blob"
+          if [ "$hits" -gt 0 ]; then
+            echo "::error::$hits 个 blob 含内部信息。HEAD 改干净【不够】——"
+            echo "::error::历史里的 blob 仍可被 clone 或按 SHA 直读取回，必须改写历史。"
+            exit 1
+          fi
+          echo "ok: 全历史 0 命中"
