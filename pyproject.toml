@@ -1,6 +1,6 @@
 [project]
 name = "sample-quick-control"
-version = "2.0.0"
+version = "2.1.0"
 description = "程序化控制本机 macOS 上的 Amazon Quick Desktop 应用与网页版 —— 双目标·单协议：桌面端 Electron CDP (:9333) + 网页版 Chrome CDP (:9445)"
 readme = "README.md"
 requires-python = ">=3.10"
