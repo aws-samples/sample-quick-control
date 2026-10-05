@@ -8,7 +8,143 @@ SCRIPTS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 sys.path.insert(0, SCRIPTS)
 
 import chrome_as  # noqa: E402
+import quick_ctl  # noqa: E402
 import web_ensure  # noqa: E402
+
+
+# ---------- quick_ctl:状态推导纯函数 + 需输入词表 ----------
+
+def test_derive_state_precedence():
+    """优先级:需输入 > 生成中 > 完成。needs_input 永远压过 generating。"""
+    assert quick_ctl._derive_state(True, True) == "needs_input"
+    assert quick_ctl._derive_state(True, False) == "thinking"
+    assert quick_ctl._derive_state(False, True) == "needs_input"
+    assert quick_ctl._derive_state(False, False) == "done"
+
+
+def test_needs_input_tokens():
+    """英文审批词必须以小写存储(扫描时统一转小写才能命中),中文词原样在列表里。"""
+    for t in ("allow", "approve", "continue", "grant"):
+        assert t in quick_ctl.NEEDS_INPUT_TOKENS
+        assert t == t.lower()
+    for t in ("允许", "授权", "继续", "同意", "确认"):
+        assert t in quick_ctl.NEEDS_INPUT_TOKENS
+
+
+def test_choice_card_skip_tokens():
+    """选项卡等待态词表:英文 skip 小写存储,中文"跳过"原样;_needs_input 第二条判据靠它。
+
+    真机确认:agent 等待时渲染为一组可用 button[role=radio] + Skip 按钮(无 Allow/Approve),
+    仅靠审批词会漏判成 done,故需这组 Skip 词支撑选项卡判据。
+    """
+    assert "skip" in quick_ctl.SKIP_TOKENS and "skip" == "skip".lower()
+    assert "跳过" in quick_ctl.SKIP_TOKENS
+
+
+def test_derive_state_needs_input_from_choice_card():
+    """选项卡等待态下 _needs_input 为真(generating 为假)时,状态仍应是 needs_input。"""
+    assert quick_ctl._derive_state(False, True) == "needs_input"
+
+
+# ---------- quick_ctl:status-all 纯逻辑(无浏览器) ----------
+
+def test_chat_state_truth_table():
+    """单行状态真值表:非激活行 dot→attention 否则 idle;激活行原样返回 active_state。"""
+    assert quick_ctl._chat_state(True, False, "done") == "attention"
+    assert quick_ctl._chat_state(False, False, "done") == "idle"
+    # 激活行:不论 dot,返回传入的 active_state
+    for st in ("thinking", "needs_input", "done"):
+        assert quick_ctl._chat_state(True, True, st) == st
+        assert quick_ctl._chat_state(False, True, st) == st
+
+
+def test_active_index():
+    """_active_index:精确 slug 命中 / 截断 slug 的 startswith 容错 / 无匹配 → -1。"""
+    names = ["Checking email reply status", "AI integration strategy at T. Rowe Price"]
+    # 精确:URL 末段恰为完整 slug
+    assert quick_ctl._active_index(names, "file:///chat/d01da364/checking-email-reply-status") == 0
+    # 截断容错:URL slug 是标题 slug 的前缀
+    assert quick_ctl._active_index(names, "file:///chat/x/ai-integration-strategy") == 1
+    # 无匹配
+    assert quick_ctl._active_index(names, "file:///chat/x/something-else-entirely") == -1
+    # 空 URL 末段
+    assert quick_ctl._active_index(names, "") == -1
+
+
+def test_assemble_chats_all():
+    """chats=None:按侧栏顺序全量输出,全部 found=True,仅 active_idx 行 active=True 且状态正确。"""
+    rows = [{"name": "A", "dot": False}, {"name": "B", "dot": True}, {"name": "C", "dot": False}]
+    out = quick_ctl._assemble_chats(rows, active_idx=0, active_state="thinking", chats=None)
+    assert [c["name"] for c in out] == ["A", "B", "C"]
+    assert all(c["found"] for c in out)
+    assert [c["active"] for c in out] == [True, False, False]
+    assert [c["state"] for c in out] == ["thinking", "attention", "idle"]
+
+
+def test_assemble_chats_selection_order_and_missing():
+    """chats 给定:保序、精确匹配(非子串)、缺失名字 found=False/state idle/active False。"""
+    rows = [{"name": "Chat A", "dot": False},
+            {"name": "Chat AA", "dot": True},
+            {"name": "Chat B", "dot": True}]
+    out = quick_ctl._assemble_chats(rows, active_idx=0, active_state="done",
+                                    chats=["Chat B", "Nope", "Chat A"])
+    assert [c["name"] for c in out] == ["Chat B", "Nope", "Chat A"]
+    # 顺序保持;缺失项
+    assert out[1] == {"name": "Nope", "state": "idle", "active": False, "found": False}
+    # "Chat A" 精确匹配到下标 0(active),不会误配 "Chat AA"
+    assert out[2]["found"] is True and out[2]["active"] is True and out[2]["state"] == "done"
+    # "Chat B" 有 dot 但非激活 → attention
+    assert out[0]["found"] is True and out[0]["active"] is False and out[0]["state"] == "attention"
+
+
+def test_dom_active_index():
+    """_dom_active_index:恰一行 sel=True → 该下标;零行 sel → -1;多于一行 sel=True → -1(歧义交回 URL-slug)。"""
+    rows = [{"name": "A", "dot": False, "sel": False},
+            {"name": "B", "dot": False, "sel": True},
+            {"name": "C", "dot": False, "sel": False}]
+    assert quick_ctl._dom_active_index(rows) == 1
+    # 零行报告 sel → -1
+    none_sel = [{"name": "A", "dot": False, "sel": False},
+                {"name": "B", "dot": True, "sel": False}]
+    assert quick_ctl._dom_active_index(none_sel) == -1
+    # 两行 sel=True → 歧义 → -1
+    two_sel = [{"name": "A", "dot": False, "sel": True},
+               {"name": "B", "dot": False, "sel": True}]
+    assert quick_ctl._dom_active_index(two_sel) == -1
+    # sel 键缺省按假处理
+    assert quick_ctl._dom_active_index([{"name": "A", "dot": False}]) == -1
+
+
+def test_chats_arg_parsing():
+    """--chats 多值解析:缺省 None;收集到下一个 -- 开头 token 或末尾为止。"""
+    assert quick_ctl._chats_arg([]) is None
+    assert quick_ctl._chats_arg(["--other"]) is None
+    assert quick_ctl._chats_arg(["--chats", "A", "B", "C"]) == ["A", "B", "C"]
+    assert quick_ctl._chats_arg(["--chats", "A", "--flag", "B"]) == ["A"]
+    assert quick_ctl._chats_arg(["--chats"]) == []
+
+
+# ---------- quick_ctl:focus(OS 级前置,全程 mock subprocess.run,绝不 spawn) ----------
+
+def test_focus_invokes_open_a(monkeypatch):
+    """focus() 必须用 open -a 'Amazon Quick' 前置,且不真正 spawn。"""
+    calls = []
+    class _R: returncode = 0
+    def fake_run(argv, *a, **k):
+        calls.append(argv); return _R()
+    monkeypatch.setattr(quick_ctl.subprocess, "run", fake_run)
+    quick_ctl.focus()
+    assert calls == [["open", "-a", "Amazon Quick"]]
+
+
+def test_focus_nonzero_exits(monkeypatch):
+    """open 返回非零时 focus() 必须 sys.exit(1)。"""
+    import pytest
+    class _R: returncode = 1
+    monkeypatch.setattr(quick_ctl.subprocess, "run", lambda *a, **k: _R())
+    with pytest.raises(SystemExit) as ei:
+        quick_ctl.focus()
+    assert ei.value.code == 1
 
 
 # ---------- chrome_as:_as_string 是 v1.x AppleScript 遗留纯函数 ----------
