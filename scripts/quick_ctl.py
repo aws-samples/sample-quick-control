@@ -6,7 +6,9 @@
 
 ━━━ 连接/状态 ━━━
   ensure                     确保 Quick 带调试端口运行（未开则带 --remote-debugging-port 重启）
+  focus                      把 Amazon Quick 窗口前置到前台（OS 级激活，非 CDP）
   status                     JSON 打印连接/URL/模型
+  status-all [--chats A B..] JSON 打印每个侧栏对话的状态(看板用；省略 --chats 则全量)
   screenshot [路径]          截图（默认 /tmp/quick.png）
   map [路径]                 dump 当前界面所有可交互元素（建选择器/排错用）
 
@@ -86,6 +88,14 @@ CDP = f"http://127.0.0.1:{PORT}"
 APP = "/Applications/Amazon Quick.app/Contents/MacOS/Amazon Quick"
 APP_NAME = "Amazon Quick"
 PH = "Ask a question"
+# 需要人工介入的审批/许可按钮词(英文小写,因扫描时统一转小写;中文无大小写)
+NEEDS_INPUT_TOKENS = ("allow","approve","continue","grant","允许","授权","继续","同意","确认")
+# 选项卡(choice card)等待态的"跳过"按钮词:真机确认 agent 等待时渲染为一组可用 radio + Skip 按钮,无 Allow/Approve
+SKIP_TOKENS = ("skip","跳过")
+
+def _derive_state(generating, needs_input):
+    """纯函数:由两个布尔推导对话状态(优先级:需输入 > 生成中 > 完成)。无浏览器/无 I/O。"""
+    return "needs_input" if needs_input else "thinking" if generating else "done"
 
 # ---------- 连接底座 ----------
 def _http_ok():
@@ -105,6 +115,17 @@ def ensure():
         time.sleep(1)  # nosemgrep: arbitrary-sleep -- 浏览器/应用自动化必须等渲染或 CDP 响应,非忙等
         if _http_ok(): print(f"✓ 已带调试端口启动 (port {PORT})"); return
     print("✗ 无法连接 CDP",file=sys.stderr); sys.exit(1)
+
+def focus():
+    """把 Amazon Quick 窗口前置到前台(OS 级激活,非 CDP)。
+    用 open -a(无需自动化授权权限;osascript activate 需要 Automation 权限)。"""
+    try:
+        r = subprocess.run(["open", "-a", APP_NAME], capture_output=True)
+    except Exception as e:
+        print(f"✗ 无法前置 Amazon Quick: {e}", file=sys.stderr); sys.exit(1)
+    if r.returncode != 0:
+        print(f"✗ 无法前置 Amazon Quick (open 退出码 {r.returncode})", file=sys.stderr); sys.exit(1)
+    print("✓ 已前置 Amazon Quick")
 
 def _page():
     from playwright.sync_api import sync_playwright
@@ -141,8 +162,10 @@ def status():
     pw,b,pg=_page()
     try:
         lines=[l.strip() for l in _txt(pg).split("\n") if l.strip()]
+        gen=_generating(pg); ni=_needs_input(pg)  # 对同一个已打开的 pg 读,不另开连接
         print(json.dumps({"connected":True,"port":PORT,"url":pg.url[:75],
-            "model":next((l for l in lines if l in("Quick","Smart","Fast","Balanced")),"?")},ensure_ascii=False))
+            "model":next((l for l in lines if l in("Quick","Smart","Fast","Balanced")),"?"),
+            "generating":gen,"needs_input":ni,"state":_derive_state(gen,ni)},ensure_ascii=False))
     finally: b.close();pw.stop()
 
 def screenshot(path=_out("quick.png")):
@@ -163,6 +186,11 @@ def do_map(path=_out("quick_screen.json")):
         print(f"→ {path}")
     finally: b.close();pw.stop()
 
+# ★ 待真机复核(BUG 2b):用户曾在生成进行中观察到 status 返回 state:done,
+#   说明此构建对"进行中"控件的标注可能不同于 Stop / Stop generating。
+#   但确切信号(aria-label 文案、禁用态 composer 语义、"停止"中文变体)无法在死端口 CI 下观测,
+#   盲目放宽匹配会误伤 _wait_idle/wait_done(二者都依赖 _generating),故此处【刻意】维持原判据不变,
+#   待真机复核(见 .agents/tasks/verification.md 的"待真机验证"小节)后再按实测信号收窄/放宽。
 def _generating(pg):
     """是否仍在生成：有 Stop 按钮，或页面末尾还停在 Thinking/Thought(无正文)。"""
     if pg.get_by_role("button",name="Stop").count()>0: return True
@@ -172,6 +200,16 @@ def _generating(pg):
         if pg.get_by_role("button",name="Stop generating").count()>0: return True
     except Exception: pass
     return False
+
+def _needs_input(pg):
+    """是否在等待人工介入。单次 CDP 读(不另开连接),两条判据任一命中即 True:
+    1) 可见的许可/审批按钮:扫 button/[role=button],(aria-label+innerText) 转小写后匹配 NEEDS_INPUT_TOKENS;
+    2) 选项卡等待态(真机确认):存在可用的 button[role=radio] 且同时有一个文字含 SKIP_TOKENS 的可见按钮,
+       —— 这种"多选项 + Skip、无 Allow/Approve"的形态,仅靠判据1 会漏判成 done。"""
+    try:
+        return bool(pg.evaluate("([toks,skips])=>{const vis=el=>{const r=el.getBoundingClientRect();const s=getComputedStyle(el);return r.width>0&&r.height>0&&s.visibility!=='hidden'&&s.display!=='none';};const btns=[...document.querySelectorAll('button,[role=button]')].filter(vis);if(btns.some(el=>{const t=((el.getAttribute('aria-label')||'')+' '+(el.innerText||'')).toLowerCase();return toks.some(k=>t.includes(k));}))return true;const dis=el=>el.disabled||el.getAttribute('aria-disabled')==='true';const radio=[...document.querySelectorAll('button[role=radio]')].some(el=>vis(el)&&!dis(el));const skip=btns.some(el=>{const t=((el.getAttribute('aria-label')||'')+' '+(el.innerText||'')).toLowerCase();return skips.some(k=>t.includes(k));});return radio&&skip;}", [list(NEEDS_INPUT_TOKENS), list(SKIP_TOKENS)]))
+    except Exception:
+        return False
 
 def _wait_idle(pg, before_len, timeout=240):
     """等生成结束：文字稳定 N 轮 + 无 Stop 按钮 + 尾部不再是 Thinking。
@@ -253,8 +291,22 @@ def stop():
     finally: b.close();pw.stop()
 
 def new_chat():
+    """开新对话:点左栏主导航的 "Chat"(data-testid=nav-home)。真机确认此构建无全局 "New chat" 按钮,
+    按 New-chat 名称找只会命中每个文件夹里的 "New chat in folder",会误把焦点落到顶部文件夹。
+    依次尝试三个独立定位器(各自 .count() 判定,不用 .or_() 合并,避免 strict-mode 命中多元素而崩):
+      1) [data-testid=nav-home] —— 命中则点 .first;
+      2) 否则精确 role=button name="Chat"(exact,不子串误伤)—— 命中则点 .first;
+      3) 否则 JS 兜底:点第一个 button[data-testid=nav-home],或去空白后文字恰为 "Chat" 的按钮。
+    三者皆空则中文 stderr 提示 + sys.exit(1)(不抛未捕获 traceback);走 try 内以保证 finally 关浏览器。"""
     pw,b,pg=_page()
-    try: pg.get_by_role("button",name="New chat").first.click();time.sleep(0.6);print("✓ 新对话")  # nosemgrep: arbitrary-sleep -- 浏览器/应用自动化必须等渲染或 CDP 响应,非忙等
+    try:
+        home=pg.locator("[data-testid=nav-home]")
+        chat=pg.get_by_role("button",name="Chat",exact=True)
+        if home.count()>=1: home.first.click()
+        elif chat.count()>=1: chat.first.click()
+        elif not pg.evaluate("""()=>{const b=document.querySelector('button[data-testid=nav-home]')||[...document.querySelectorAll('button')].find(x=>(x.innerText||'').trim()==='Chat');if(b){b.click();return true;}return false;}"""):
+            print("✗ 未找到 Chat 导航按钮",file=sys.stderr); sys.exit(1)
+        time.sleep(0.6); print("✓ 新对话 (Chat)")  # nosemgrep: arbitrary-sleep -- 浏览器/应用自动化必须等渲染或 CDP 响应,非忙等
     finally: b.close();pw.stop()
 
 def regenerate():
@@ -271,9 +323,144 @@ def list_chats():
         print("\n".join(dict.fromkeys(items)) if items else "(无历史对话)")
     finally: b.close();pw.stop()
 
+# JS 兜底:在 [role=option] 行里点第一个 aria-label/innerText(去空白)含 kw 的行(点行本身,不点标题 span)。
+# 镜像 _act_in/open_chat_cycle 的 JS-click 风格;命中返回 true,否则 false。
+OPEN_CHAT_FALLBACK_JS = r"""
+(kw) => {
+  const k=(kw||'').trim();
+  const opts=[...document.querySelectorAll('[role=option]')];
+  const hit=opts.find(o=>(((o.getAttribute('aria-label')||'')+' '+(o.innerText||'')).trim()).includes(k));
+  if(hit){hit.click();return true;}
+  return false;
+}
+"""
+
 def open_chat(kw):
+    """按标题打开历史对话:始终点整行([role=option]),绝不点标题 span,绝不触发 strict mode。
+    依次尝试三个独立定位器(各自 .count() 判定,不用 .or_() 合并,避免 strict-mode 命中多元素而崩):
+      1) 精确 role=option(exact)—— 命中则点 .first;
+      2) 否则子串 role=option —— 命中则点 .first;
+      3) 否则 JS 兜底:遍历 [role=option] 点第一个标题含 kw 的行。
+    三者皆空则打印中文未找到提示到 stderr 并 sys.exit(1)(不抛未捕获 traceback);stderr/exit 走 try 内以保证 finally 关浏览器。"""
     pw,b,pg=_page()
-    try: pg.get_by_role("option",name=kw).first.or_(pg.get_by_text(kw,exact=False).first).click();time.sleep(0.8);print(f"✓ 打开『{kw}』")  # nosemgrep: arbitrary-sleep -- 浏览器/应用自动化必须等渲染或 CDP 响应,非忙等
+    try:
+        exact=pg.get_by_role("option",name=kw,exact=True)
+        contains=pg.get_by_role("option",name=kw)
+        if exact.count()>=1: exact.first.click()
+        elif contains.count()>=1: contains.first.click()
+        elif not pg.evaluate(OPEN_CHAT_FALLBACK_JS, kw):
+            print(f"✗ 未找到对话『{kw}』",file=sys.stderr); sys.exit(1)
+        time.sleep(0.8); print(f"✓ 打开『{kw}』")  # nosemgrep: arbitrary-sleep -- 浏览器/应用自动化必须等渲染或 CDP 响应,非忙等
+    finally: b.close();pw.stop()
+
+def _slugify(s):
+    """把对话标题转成 URL slug 风格:转小写、非字母数字(含中文)→连字符、去首尾连字符。
+    与 Quick 的 file:///chat/<id>/<slug> 对齐,用于反推当前激活对话。"""
+    out=[]; prev_dash=True  # 以 True 起手可吃掉前导连字符
+    for ch in s.lower():
+        if ch.isalnum(): out.append(ch); prev_dash=False
+        elif not prev_dash: out.append("-"); prev_dash=True
+    return "".join(out).strip("-")
+
+def _active_index(names, url):
+    """从 URL 末段 slug 反推当前激活对话在 names 里的下标(无匹配返回 -1)。纯函数,无 I/O。
+    把每个标题 slugify 后与 URL 末段 slug 做 contains/startswith 容错匹配(slug 可能被截断)。"""
+    tail=(url.rstrip("/").split("/")[-1] or "").lower()  # URL 末段 slug
+    if not tail: return -1
+    for i,nm in enumerate(names):
+        sg=_slugify(nm)
+        if sg and (tail.startswith(sg) or sg.startswith(tail) or sg in tail or tail in sg):
+            return i
+    return -1
+
+def open_chat_cycle(direction):
+    """在左侧 [role=option] 历史列表里按 direction(next/prev)循环切换,支持回绕。
+    单次 page.evaluate 返回有序名单与当前页 URL;激活项由 URL 推导(见下)。
+    ★ 激活项判据改用 pg.url(真机确认):侧栏行并无 aria-selected / selected 类标记,
+      唯一可靠信号是地址栏 file:///chat/<id>/<slug>。做法:把每个选项标题 slugify 后与
+      URL 末段 slug 做 contains/startswith 容错匹配(slug 可能被截断),命中即激活项。
+      仅当没有任何选项匹配 URL slug 时才降级:next→第一条,prev→最后一条,并打印中文提示。"""
+    pw,b,pg=_page()
+    try:
+        d=pg.evaluate("""()=>{const opts=[...document.querySelectorAll('[role=option]')];const names=opts.map(e=>(e.getAttribute('aria-label')||e.innerText||'').trim());return{names:names.filter(Boolean),url:location.href};}""")
+        names=d["names"]; n=len(names)
+        if n==0: print("(无历史对话)"); return
+        active=_active_index(names, d["url"])  # 由 URL slug 推导激活项
+        if active==-1:
+            print("⚠ 未能从 URL 识别当前激活对话,降级到边界项")
+            idx=0 if direction=="next" else n-1
+        else:
+            idx=(active+1)%n if direction=="next" else (active-1)%n
+        kw=names[idx]
+        exact=pg.get_by_role("option",name=kw,exact=True)
+        contains=pg.get_by_role("option",name=kw)
+        if exact.count()>=1: exact.first.click()
+        elif contains.count()>=1: contains.first.click()
+        elif not pg.evaluate(OPEN_CHAT_FALLBACK_JS, kw):
+            print(f"✗ 未找到对话『{kw}』",file=sys.stderr); sys.exit(1)
+        time.sleep(0.8)  # nosemgrep: arbitrary-sleep -- 浏览器/应用自动化必须等渲染或 CDP 响应,非忙等
+        print(f"✓ 切换到『{kw}』")
+    finally: b.close();pw.stop()
+
+# 侧栏行扫描 JS:优先 .history-item,拿每行 [role=option] 标题 + 是否有 span.approval-dot;降级到 [role=option]。
+# 另【附加】采集每行是否报告"激活"(sel):aria-selected==='true' 或 box className 含 \bactive\b。
+# 这是加法式扩展(JSON 不删/改既有键):当前构建侧栏行据真机 ground truth 并无此标记,
+# 故 sel 恒 false、不改变现有行为;若未来构建补上该标记,_dom_active_index 便可据此优先判激活项。
+STATUS_ALL_JS = r"""
+() => {
+  const nm=o=>((o.getAttribute('aria-label')||o.innerText||'').trim());
+  const act=(o,box)=>(o&&o.getAttribute('aria-selected')==='true')||/\b(active)\b/.test((box&&box.className)||'');
+  const rows=[];
+  const items=[...document.querySelectorAll('.history-item')];
+  if(items.length){
+    items.forEach(it=>{const o=it.querySelector('[role=option]');const name=o?nm(o):(it.innerText||'').trim();if(name)rows.push({name,dot:!!it.querySelector('span.approval-dot'),sel:act(o,it)});});
+  }else{
+    [...document.querySelectorAll('[role=option]')].forEach(o=>{const name=nm(o);if(!name)return;const box=o.closest('.history-item')||o.parentElement;rows.push({name,dot:!!(box&&box.querySelector('span.approval-dot')),sel:act(o,box)});});
+  }
+  return {rows,url:location.href};
+}
+"""
+
+def _dom_active_index(rows):
+    """纯函数:若【且仅若】恰有一行 sel 为真,返回其下标;零行或多于一行报告 sel 为真则返回 -1(有歧义 → 交回 URL-slug 判据)。无 I/O。
+    rows 为 [{"name","dot","sel"},...](sel 缺省按假处理)。"""
+    idxs=[i for i,r in enumerate(rows) if r.get("sel")]
+    return idxs[0] if len(idxs)==1 else -1
+
+def _chat_state(dot, is_active, active_state):
+    """纯函数:单行最终状态。激活行用传入的 active_state;非激活行有待处理点→attention,否则 idle。"""
+    return active_state if is_active else ("attention" if dot else "idle")
+
+def _assemble_chats(rows, active_idx, active_state, chats):
+    """纯函数:组装输出的 chats 列表。rows 为浏览器返回的 [{"name","dot"},...]。
+    chats 为 None 时按侧栏顺序全量输出(found 恒 True);否则按请求顺序精确匹配(非子串),
+    缺失的名字输出 found:False、state idle、active False。无浏览器/无 I/O。"""
+    if chats is None:
+        return [{"name":r["name"],"state":_chat_state(r["dot"],i==active_idx,active_state),
+                 "active":i==active_idx,"found":True} for i,r in enumerate(rows)]
+    out=[]
+    for req in chats:
+        idx=next((i for i,r in enumerate(rows) if r["name"].strip()==req.strip()),-1)  # 精确匹配
+        if idx==-1: out.append({"name":req,"state":"idle","active":False,"found":False})
+        else: out.append({"name":rows[idx]["name"],"state":_chat_state(rows[idx]["dot"],idx==active_idx,active_state),
+                          "active":idx==active_idx,"found":True})
+    return out
+
+def status_all(chats=None):
+    """一次 CDP 连接 + 一次主 page.evaluate,报告每个侧栏对话的状态(供 Stream Deck 看板)。
+    激活对话由 URL slug 推导,其状态走 _derive_state(读已打开的 pg,不另开连接);
+    其余对话按有无 span.approval-dot 映射 attention/idle。"""
+    pw,b,pg=_page()
+    try:
+        d=pg.evaluate(STATUS_ALL_JS)
+        rows=[r for r in d["rows"] if r.get("name")]  # 过滤空名
+        # 优先用 DOM-active 标记(恰一行报告 sel 时);无/歧义则降级到 URL-slug(既有行为,不退化)。
+        active_idx=_dom_active_index(rows)
+        if active_idx==-1: active_idx=_active_index([r["name"] for r in rows], d["url"])
+        active_state=_derive_state(_generating(pg), _needs_input(pg))  # 仅激活项读 pg,无新连接
+        active_name=rows[active_idx]["name"] if active_idx>=0 else None
+        out=_assemble_chats(rows, active_idx, active_state, chats)
+        print(json.dumps({"connected":True,"active":active_name,"chats":out},ensure_ascii=False))
     finally: b.close();pw.stop()
 
 def delete_chat(kw, yes=False):
@@ -619,6 +806,14 @@ def wait_idle(timeout=180):
     try: _wait_idle(pg,0,int(timeout)); print("✓ 生成结束/空闲")
     finally: b.close();pw.stop()
 
+def _chats_arg(a):
+    """解析 status-all 的多值 --chats:缺省返回 None(报告全部);否则取 --chats 之后、
+    到下一个以 -- 开头的 token 或列表末尾为止的所有名字。纯列表切片,死端口下不会抛异常。"""
+    if "--chats" not in a: return None
+    i=a.index("--chats")+1; names=[]
+    while i<len(a) and not a[i].startswith("--"): names.append(a[i]); i+=1
+    return names
+
 def main():
     if len(sys.argv)<2: print(__doc__); return
     c=sys.argv[1]; a=sys.argv[2:]
@@ -626,7 +821,9 @@ def main():
     def val(flag,d=None):
         return a[a.index(flag)+1] if flag in a and a.index(flag)+1<len(a) else d
     if c=="ensure": ensure()
+    elif c=="focus": focus()
     elif c=="status": status()
+    elif c=="status-all": status_all(_chats_arg(a))
     elif c=="screenshot": screenshot(a[0] if a and not a[0].startswith("-") else _out("quick.png"))
     elif c=="map": do_map(a[0] if a else _out("quick_screen.json"))
     elif c in ("send","ask"): send(a[0], wait=not opt("--no-wait"))
@@ -637,6 +834,7 @@ def main():
     elif c=="new-chat": new_chat()
     elif c=="regenerate": regenerate()
     elif c=="list-chats": list_chats()
+    elif c=="open-chat" and ("--next" in a or "--prev" in a): open_chat_cycle("next" if "--next" in a else "prev")
     elif c=="open-chat": open_chat(a[0])
     elif c=="delete-chat": delete_chat(a[0], yes=opt("--yes"))
     elif c=="search-chats": search_chats(a[0])

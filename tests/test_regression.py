@@ -179,6 +179,95 @@ def test_quick_ctl_wait_done_present():
     assert "wait-done" in _dispatch_literals("quick_ctl.py")
 
 
+def test_quick_ctl_status_all_present():
+    """status-all(Stream Deck 看板:每个对话状态)命令必须在 dispatch 里。"""
+    assert "status-all" in _dispatch_literals("quick_ctl.py")
+
+
+def test_quick_ctl_focus_present():
+    """focus(OS 级前置当前 Quick 窗口)命令必须在 dispatch 里。"""
+    assert "focus" in _dispatch_literals("quick_ctl.py")
+
+
+def _func_def(name: str, fn: str) -> ast.FunctionDef:
+    """从源码里取出指定名字的顶层(或任意层)FunctionDef 节点(精确名匹配)。"""
+    tree = ast.parse(_src(name))
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef) and node.name == fn:
+            return node
+    raise AssertionError(f"{name} 里找不到函数 {fn!r}")
+
+
+def test_open_chat_no_or_across_locators():
+    """open_chat 不得再用 `.or_(` 跨定位器合并 —— 那是触发 Playwright strict-mode 崩溃的根因。
+
+    精确取 open_chat 的 FunctionDef(排除 open_chat_cycle),遍历其内所有 ast.Call,
+    断言没有任何属性调用名为 or_(即 `xxx.or_(...)`)。strict-mode 下 a.or_(b) 会解析到
+    多个元素,.first 不能约束合并集 —— 故改为三个独立 .count() 判定的候选依次点击。
+    """
+    fn = _func_def("quick_ctl.py", "open_chat")
+    assert fn.name == "open_chat"  # 不是 open_chat_cycle
+    for node in ast.walk(fn):
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+            assert node.func.attr != "or_", "open_chat 仍在用 .or_() 跨定位器合并(会触发 strict-mode 崩溃)"
+
+
+def test_open_chat_targets_option_role():
+    """open_chat 必须点行([role=option]),不点标题 span —— 用源码片段断言 role/option 策略被钉住。"""
+    fn = _func_def("quick_ctl.py", "open_chat")
+    seg = ast.get_source_segment(_src("quick_ctl.py"), fn)
+    assert seg is not None
+    assert "option" in seg, "open_chat 不再定位 role=option 行"
+    assert "role" in seg, "open_chat 不再按 role 定位"
+
+
+def test_open_chat_cycle_no_or_across_locators():
+    """open_chat_cycle 不得再用 `.or_(` 跨定位器合并 —— 与 open_chat 同根因的 strict-mode 崩溃。
+
+    精确取 open_chat_cycle 的 FunctionDef,遍历其内所有 ast.Call,断言没有任何
+    属性调用名为 or_(即 `xxx.or_(...)`)。切换对话的点击改为三个独立 .count() 判定的候选依次点行。
+    """
+    fn = _func_def("quick_ctl.py", "open_chat_cycle")
+    assert fn.name == "open_chat_cycle"
+    for node in ast.walk(fn):
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+            assert node.func.attr != "or_", "open_chat_cycle 仍在用 .or_() 跨定位器合并(会触发 strict-mode 崩溃)"
+
+
+def test_open_chat_cycle_targets_option_role():
+    """open_chat_cycle 必须点行([role=option]),不点标题 span —— 源码片段断言 role/option 策略被钉住。"""
+    fn = _func_def("quick_ctl.py", "open_chat_cycle")
+    seg = ast.get_source_segment(_src("quick_ctl.py"), fn)
+    assert seg is not None
+    assert "option" in seg, "open_chat_cycle 不再定位 role=option 行"
+    assert "role" in seg, "open_chat_cycle 不再按 role 定位"
+
+
+def test_new_chat_targets_nav_home():
+    """new_chat 必须改点主导航 "Chat"(data-testid=nav-home),不得再用裸 name="New chat" 选择器。
+
+    真机确认此构建无全局 "New chat" 按钮,name="New chat" 只命中每文件夹的 "New chat in folder",
+    会误把焦点落到顶部文件夹。精确取 new_chat 的源码片段断言:
+      (a) 新选择器字面量 nav-home 已就位;
+      (b) 旧的 name="New chat" 选择器已消失。
+    """
+    fn = _func_def("quick_ctl.py", "new_chat")
+    seg = ast.get_source_segment(_src("quick_ctl.py"), fn)
+    assert seg is not None
+    assert "nav-home" in seg, "new_chat 未改用 data-testid=nav-home 选择器"
+    assert 'name="New chat"' not in seg, "new_chat 仍在用裸 name=\"New chat\" 选择器(会误点每文件夹的 New chat in folder)"
+
+
+@pytest.mark.parametrize("flag", ["--next", "--prev"])
+def test_quick_ctl_open_chat_cycle_flags_present(flag):
+    """open-chat 的循环切换标志必须作为 Compare 字面量出现在 dispatch 里。
+
+    守护 open-chat --next/--prev 路由不被误删 —— Stream Deck 轮换按钮靠它。
+    """
+    assert flag in _dispatch_literals("quick_ctl.py"), \
+        f"open-chat 循环标志 {flag!r} 从 quick_ctl.py 的 dispatch 中消失"
+
+
 def test_quick_web_py_absent():
     """quick_web.py 不应存在。
 

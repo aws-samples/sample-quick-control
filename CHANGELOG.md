@@ -15,6 +15,45 @@
 ### Fixed
 - `docs/architecture.svg` 里 `quick_ctl.py · 27+ 能力` 是 v1.x 遗留计数，实际 dispatch 表为 **59** 个命令（README 正文一直写的 59 才是对的）。中英两版图均已改为 59。
 
+## [2.1.0] - 2026-10-05
+
+Desktop channel (`quick_ctl.py`) gains machine-readable chat-state reporting and
+chat navigation, intended for external monitors/controllers (e.g. a Stream Deck
+plugin) that poll the CLI and branch on its JSON. The CLI contract stays
+backward compatible: existing commands, exit codes, and JSON keys are unchanged;
+all additions are new keys or new commands. (Note: per the repo convention, the
+code comments remain in Simplified Chinese; this entry is in English for the
+public changelog.)
+
+### Added
+- **`status-all [--chats A B ...]`** — one CDP connection reports every sidebar
+  chat's state as JSON `{connected, active, chats:[{name, state, active, found}]}`.
+  Non-active chats are `attention` (sidebar `span.approval-dot` present, i.e.
+  awaiting input) or `idle`; the active chat (identified from the page URL slug)
+  gets a full `thinking | needs_input | done`. Names are matched exactly and the
+  requested order is preserved; a name not found returns `found:false`.
+- **`status` gains three additive keys** — `generating` (bool), `needs_input`
+  (bool), and `state` (`thinking | needs_input | done`) for the active chat.
+  `needs_input` detects both an approval/permission button and the
+  choice-card-waiting pattern (an enabled `role=radio` group plus a Skip button).
+  Existing `status` keys (`connected`, `port`, `url`, `model`) are unchanged.
+- **`open-chat --next` / `open-chat --prev`** — cycle through the sidebar chat
+  list with wrap-around; the active chat is derived from the page URL.
+- **`focus`** — bring the Amazon Quick macOS window to the foreground via
+  `open -a` (no CDP connection, no Automation permission prompt). Useful for a
+  remote controller to pull the app back after switching away.
+
+### Fixed
+- **`open-chat` strict-mode crash** — the sidebar locator combined two matchers
+  with `.or_()`, which Playwright rejects in strict mode when the union resolves
+  to more than one element (the chat row and its title span). It now resolves the
+  `[role=option]` row independently (exact name, then substring, then a JS
+  fallback) and never raises; a missing chat exits non-zero instead of a
+  traceback. The same fix is applied to `open-chat --next/--prev`.
+- **`new-chat` targeted the wrong control** — it matched a per-folder "New chat"
+  button and focused the first folder. It now clicks the primary "Chat" nav item
+  (`data-testid=nav-home`), landing on a fresh chat.
+
 ## [2.0.0] - 2026-07-27
 
 **架构收敛：双目标 · 单协议。** 网页版通道底层从 AppleScript 换成 CDP，两条通道（桌面端 Electron `:9333` / 网页版 Chrome `:9445`）从此说同一种协议。触发这次迁移的不是新需求，而是**发现 v1.x 把网页通道锁在 AppleScript 上的那条技术结论是误判**（见 Fixed）。

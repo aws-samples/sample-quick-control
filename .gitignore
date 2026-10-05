@@ -25,3 +25,7 @@ uv.lock
 
 # playwright
 node_modules/
+# AI agent tooling / local scaffolding (not part of the project)
+.agents/
+.kiro/
+.worktrees/
