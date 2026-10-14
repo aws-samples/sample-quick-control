@@ -13,7 +13,7 @@ dependencies = [
 [project.optional-dependencies]
 test = ["pytest>=8.0"]
 # ruff 钉大版本:避免升级引入新规则把 CI 变红,也让本机与 CI 一致
-lint = ["ruff>=0.12,<0.13"]
+lint = ["ruff>=0.12,<0.18"]
 
 [tool.ruff]
 # 与 requires-python 保持一致:ruff 按此版本做语法校验,
